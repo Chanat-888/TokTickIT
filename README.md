@@ -19,11 +19,18 @@ git clone https://github.com/Chanat-888/TokTickIT.git
 cd TokTickIT
 ```
 
-### 2. Create the database
+### 2. Create the database role and database
+
+The `DATABASE_URL` in `server/.env.example` connects as the `toktickit` role, so
+that role must exist before Prisma can connect:
 
 ```
-psql -U postgres -c "CREATE DATABASE toktickit;"
+psql -U postgres -c "CREATE ROLE toktickit WITH LOGIN PASSWORD 'toktickit';"
+psql -U postgres -c "CREATE DATABASE toktickit OWNER toktickit;"
 ```
+
+If you prefer to use an existing PostgreSQL role, skip the first command and set
+`DATABASE_URL` to that role's credentials in step 3 instead.
 
 ### 3. Configure the backend environment
 
@@ -40,7 +47,20 @@ DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/toktickit?schema=public"
 
 `.env` is listed in `.gitignore` and must never be committed.
 
-### 4. Install dependencies
+### 4. Configure the frontend environment
+
+Vite reads the API base URL from `client/.env`, which is also gitignored:
+
+```
+cd client
+copy .env.example .env
+```
+
+The default `VITE_API_URL` is `http://localhost:3000`, matching the backend
+below. Vite only reads this file at startup, so restart the dev server after
+changing it.
+
+### 5. Install dependencies
 
 ```
 cd server
