@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { checkSystem, Category } from "./api.js";
 
-// UI states you must handle for Issue 4: idle, loading, success, error.
+// UI states handled below: idle, loading, success, error.
 type UiState = "idle" | "loading" | "success" | "error";
 
 export default function App() {
@@ -10,10 +10,15 @@ export default function App() {
   void categories;
 
   async function handleCheck() {
-    // TODO(Issue 4): set loading, call checkSystem(), then either
-    //   - success: store categories and show Online + the list, or
-    //   - error: show Offline + a useful message.
     setState("loading");
+    try {
+      const result = await checkSystem();
+      setCategories(result.categories);
+      setState("success");
+    } catch {
+      setCategories([]);
+      setState("error");
+    }
   }
 
   return (
@@ -26,7 +31,24 @@ export default function App() {
         {state === "loading" ? "Loading…" : "Check System"}
       </button>
 
-      {/* TODO(Issue 4): render loading / success (Online + categories) / error (Offline) states. */}
+      {state === "loading" && (
+        <p className="text-muted mt-3 mb-0">Checking system…</p>
+      )}
+
+      {state === "success" && (
+        <div className="alert alert-success mt-3 mb-0" role="status">
+          System Status: Online
+        </div>
+      )}
+
+      {state === "error" && (
+        <div className="alert alert-danger mt-3 mb-0" role="alert">
+          <strong>System Status: Offline</strong>
+          <div>Unable to connect to TokTickIT API</div>
+        </div>
+      )}
+
+      {/* TODO(Issue 4): render the category list inside the success state. */}
     </div>
   );
 }
