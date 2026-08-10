@@ -70,6 +70,19 @@ cd ../client
 npm install
 ```
 
+### 6. Apply migrations and seed the database
+
+From `server/`:
+
+```
+npx prisma migrate deploy
+npm run prisma:seed
+```
+
+This creates the `Category` table and inserts the four supported IT request
+categories. The seed uses `upsert`, so running it more than once will not create
+duplicates.
+
 ## Running the application
 
 Two terminals are required.
