@@ -16,6 +16,11 @@ async function main() {
 
   // upsert() keys on the unique `name`, so re-running the seed updates the
   // existing row instead of inserting a duplicate.
+  //
+  // Deliberately sequential — do NOT convert this to Promise.all(). Awaiting
+  // each upsert in turn is what assigns ids 1-4 in CATEGORY_NAMES order.
+  // Issue 4 returns categories in id order, so parallelising here would make
+  // the order non-deterministic and break that.
   for (const name of CATEGORY_NAMES) {
     await prisma.category.upsert({
       where: { name },
