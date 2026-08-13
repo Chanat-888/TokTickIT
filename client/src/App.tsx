@@ -1,19 +1,23 @@
 import { useState } from "react";
 import { checkSystem, Category } from "./api.js";
 
-// UI states you must handle for Issue 4: idle, loading, success, error.
+// UI states handled below: idle, loading, success, error.
 type UiState = "idle" | "loading" | "success" | "error";
 
 export default function App() {
   const [state, setState] = useState<UiState>("idle");
   const [categories, setCategories] = useState<Category[]>([]);
-  void categories;
 
   async function handleCheck() {
-    // TODO(Issue 4): set loading, call checkSystem(), then either
-    //   - success: store categories and show Online + the list, or
-    //   - error: show Offline + a useful message.
     setState("loading");
+    try {
+      const result = await checkSystem();
+      setCategories(result.categories);
+      setState("success");
+    } catch {
+      setCategories([]);
+      setState("error");
+    }
   }
 
   return (
@@ -26,7 +30,33 @@ export default function App() {
         {state === "loading" ? "Loading…" : "Check System"}
       </button>
 
-      {/* TODO(Issue 4): render loading / success (Online + categories) / error (Offline) states. */}
+      {state === "loading" && (
+        <p className="text-muted mt-3 mb-0">Checking system…</p>
+      )}
+
+      {state === "success" && (
+        <>
+          <div className="alert alert-success mt-3 mb-0" role="status">
+            System Status: Online
+          </div>
+
+          <h2 className="h5 mt-4">Request Categories</h2>
+          <ul className="list-group">
+            {categories.map((category) => (
+              <li key={category.id} className="list-group-item">
+                {category.name}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {state === "error" && (
+        <div className="alert alert-danger mt-3 mb-0" role="alert">
+          <strong>System Status: Offline</strong>
+          <div>Unable to connect to TokTickIT API</div>
+        </div>
+      )}
     </div>
   );
 }

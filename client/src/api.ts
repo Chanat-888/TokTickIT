@@ -10,12 +10,27 @@ export interface SystemStatus {
   categories: Category[];
 }
 
-// Issue 2 + Issue 4 — call the backend.
-// Steps: fetch `${API_URL}/api/health`; if not ok, throw.
-//        then fetch `${API_URL}/api/categories`; if not ok, throw.
-//        return { online: true, categories }.
-// Throwing on failure lets the UI show a single Offline/error state.
+// Issue 2 — call the backend health endpoint.
+// Issue 4 — then fetch the seeded categories.
+// Throwing on either failure lets the UI show a single Offline/error state.
+// The timeout covers the case where the backend accepts the connection but
+// never responds — without it the UI would stay on "Checking system" forever.
+// Each fetch needs its own signal; a timeout signal cannot be reused.
 export async function checkSystem(): Promise<SystemStatus> {
-  // TODO(Issue 2 & 4): implement the two fetch calls described above.
-  throw new Error("checkSystem not implemented yet");
+  const res = await fetch(`${API_URL}/api/health`, {
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!res.ok) {
+    throw new Error(`Health check failed with status ${res.status}`);
+  }
+
+  const categoriesRes = await fetch(`${API_URL}/api/categories`, {
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!categoriesRes.ok) {
+    throw new Error(`Category fetch failed with status ${categoriesRes.status}`);
+  }
+
+  const categories = (await categoriesRes.json()) as Category[];
+  return { online: true, categories };
 }
