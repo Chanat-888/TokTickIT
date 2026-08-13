@@ -7,7 +7,6 @@ type UiState = "idle" | "loading" | "success" | "error";
 export default function App() {
   const [state, setState] = useState<UiState>("idle");
   const [categories, setCategories] = useState<Category[]>([]);
-  void categories;
 
   async function handleCheck() {
     setState("loading");
@@ -36,9 +35,20 @@ export default function App() {
       )}
 
       {state === "success" && (
-        <div className="alert alert-success mt-3 mb-0" role="status">
-          System Status: Online
-        </div>
+        <>
+          <div className="alert alert-success mt-3 mb-0" role="status">
+            System Status: Online
+          </div>
+
+          <h2 className="h5 mt-4">Request Categories</h2>
+          <ul className="list-group">
+            {categories.map((category) => (
+              <li key={category.id} className="list-group-item">
+                {category.name}
+              </li>
+            ))}
+          </ul>
+        </>
       )}
 
       {state === "error" && (
@@ -47,8 +57,6 @@ export default function App() {
           <div>Unable to connect to TokTickIT API</div>
         </div>
       )}
-
-      {/* TODO(Issue 4): render the category list inside the success state. */}
     </div>
   );
 }
