@@ -16,7 +16,8 @@ Repository I reviewed (partner's): https://github.com/ShitheadQuin/Toktickit
 | [#6](https://github.com/Chanat-888/TokTickIT/pull/6) | feature/2-health-check | lab1-staging | Approved, after two inline comments and a fix commit |
 | [#7](https://github.com/Chanat-888/TokTickIT/pull/7) | feature/3-category-seed | main *(mis-targeted — see note)* | Approved |
 | [#8](https://github.com/Chanat-888/TokTickIT/pull/8) | feature/3-category-seed | lab1-staging | Approved |
-| [#9](https://github.com/Chanat-888/TokTickIT/pull/9) | feature/4-category-list | lab1-staging | *(pending)* |
+| [#9](https://github.com/Chanat-888/TokTickIT/pull/9) | feature/4-category-list | lab1-staging | Approved |
+| [#10](https://github.com/Chanat-888/TokTickIT/pull/10) | lab1-staging *(Lab 1 release)* | main | Approved |
 
 **Note on #7 and #8.** PR #7 was opened against `main` by mistake — GitHub
 defaults the base branch to the repository default and I did not change it. It
