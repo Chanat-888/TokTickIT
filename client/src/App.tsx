@@ -1,8 +1,17 @@
+import type { ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import AppShell from "./components/AppShell.js";
+import RequesterSelect from "./screens/RequesterSelect.js";
+import { RequesterProvider, useRequester } from "./lib/requesterContext.js";
 
-function SelectRequesterPlaceholder() {
-  return <h1>Select Requester</h1>;
+// AC-02: /tickets, /tickets/new, /tickets/:id redirect here when nothing is
+// selected.
+function RequireRequester({ children }: { children: ReactNode }) {
+  const { requester } = useRequester();
+  if (!requester) {
+    return <Navigate to="/select-requester" replace />;
+  }
+  return <>{children}</>;
 }
 
 function MyTicketsPlaceholder() {
@@ -23,43 +32,51 @@ function NotFoundPlaceholder() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Navigate to="/tickets" replace />} />
-        <Route path="/select-requester" element={<SelectRequesterPlaceholder />} />
-        <Route
-          path="/tickets"
-          element={
-            <AppShell>
-              <MyTicketsPlaceholder />
-            </AppShell>
-          }
-        />
-        <Route
-          path="/tickets/new"
-          element={
-            <AppShell>
-              <CreateTicketPlaceholder />
-            </AppShell>
-          }
-        />
-        <Route
-          path="/tickets/:id"
-          element={
-            <AppShell>
-              <TicketDetailPlaceholder />
-            </AppShell>
-          }
-        />
-        <Route
-          path="*"
-          element={
-            <AppShell>
-              <NotFoundPlaceholder />
-            </AppShell>
-          }
-        />
-      </Routes>
-    </BrowserRouter>
+    <RequesterProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Navigate to="/tickets" replace />} />
+          <Route path="/select-requester" element={<RequesterSelect />} />
+          <Route
+            path="/tickets"
+            element={
+              <RequireRequester>
+                <AppShell>
+                  <MyTicketsPlaceholder />
+                </AppShell>
+              </RequireRequester>
+            }
+          />
+          <Route
+            path="/tickets/new"
+            element={
+              <RequireRequester>
+                <AppShell>
+                  <CreateTicketPlaceholder />
+                </AppShell>
+              </RequireRequester>
+            }
+          />
+          <Route
+            path="/tickets/:id"
+            element={
+              <RequireRequester>
+                <AppShell>
+                  <TicketDetailPlaceholder />
+                </AppShell>
+              </RequireRequester>
+            }
+          />
+          <Route
+            path="*"
+            element={
+              <AppShell>
+                <NotFoundPlaceholder />
+              </AppShell>
+            }
+          />
+        </Routes>
+      </BrowserRouter>
+    </RequesterProvider>
   );
 }

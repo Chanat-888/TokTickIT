@@ -1,36 +1,28 @@
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+import { API_URL } from "./lib/apiClient.js";
 
 export interface Category {
   id: number;
   name: string;
 }
 
-export interface SystemStatus {
-  online: boolean;
-  categories: Category[];
+export interface Requester {
+  id: number;
+  name: string;
 }
 
-// Issue 2 — call the backend health endpoint.
-// Issue 4 — then fetch the seeded categories.
-// Throwing on either failure lets the UI show a single Offline/error state.
+// Issue 17 — active Development Requesters, for the Requester Selection
+// screen. No X-Requester-Id header required (api-spec.md §0.1): this is the
+// endpoint that runs before a Requester is chosen, so it deliberately uses a
+// plain fetch rather than the apiClient wrapper.
 // The timeout covers the case where the backend accepts the connection but
-// never responds — without it the UI would stay on "Checking system" forever.
-// Each fetch needs its own signal; a timeout signal cannot be reused.
-export async function checkSystem(): Promise<SystemStatus> {
-  const res = await fetch(`${API_URL}/api/health`, {
+// never responds — without it the screen would stay on "Loading Requesters…"
+// forever.
+export async function getRequesters(): Promise<Requester[]> {
+  const res = await fetch(`${API_URL}/api/requesters`, {
     signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) {
-    throw new Error(`Health check failed with status ${res.status}`);
+    throw new Error(`Requesters fetch failed with status ${res.status}`);
   }
-
-  const categoriesRes = await fetch(`${API_URL}/api/categories`, {
-    signal: AbortSignal.timeout(5000),
-  });
-  if (!categoriesRes.ok) {
-    throw new Error(`Category fetch failed with status ${categoriesRes.status}`);
-  }
-
-  const categories = (await categoriesRes.json()) as Category[];
-  return { online: true, categories };
+  return (await res.json()) as Requester[];
 }

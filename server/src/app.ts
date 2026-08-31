@@ -36,7 +36,27 @@ app.get("/api/categories", async (_req: Request, res: Response) => {
     // Log the real error server-side; send the client a message that leaks
     // nothing about the database or the query.
     console.error("GET /api/categories failed:", err);
-    res.status(500).json({ error: "Unable to load categories" });
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Issue 17 — Development Requester list
+// Active Requesters only, { id, name } — email is never returned
+// (api-spec.md §12 OQ-6). No X-Requester-Id header required (§0.1): this is
+// the endpoint that runs before a Requester is chosen.
+// ---------------------------------------------------------------------------
+app.get("/api/requesters", async (_req: Request, res: Response) => {
+  try {
+    const requesters = await getPrisma().requesterUser.findMany({
+      where: { isActive: true },
+      orderBy: { id: "asc" },
+      select: { id: true, name: true },
+    });
+    res.status(200).json(requesters);
+  } catch (err) {
+    console.error("GET /api/requesters failed:", err);
+    res.status(500).json({ error: "Unexpected server error" });
   }
 });
 
