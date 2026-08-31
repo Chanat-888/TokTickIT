@@ -281,3 +281,33 @@
     height: var(--control-height);
   }
 }
+
+/* ---------------------------------------------------------------------- */
+/* Requester Selection — ui-spec.md §11, §19                              */
+/* ---------------------------------------------------------------------- */
+
+.requester-select {
+  max-width: 420px;
+  margin: var(--space-3xl) auto;
+  padding: var(--space-xl);
+  background: var(--color-surface);
+  border-radius: var(--radius-control);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.requester-select__dropdown {
+  height: var(--control-height);
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-field-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-body);
+}
+
+.requester-select__continue-btn {
+  align-self: flex-start;
+}

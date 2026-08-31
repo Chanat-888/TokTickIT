@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
+import { useRequester } from "../lib/requesterContext.js";
 
 interface AppShellProps {
   children: ReactNode;
@@ -7,6 +8,15 @@ interface AppShellProps {
 
 export default function AppShell({ children }: AppShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const { requester, clearRequester } = useRequester();
+  const navigate = useNavigate();
+
+  // ui-spec.md §10 / UI-34: no confirmation step — this discards no server
+  // data, only the client-side selection.
+  function handleChangeRequester() {
+    clearRequester();
+    navigate("/select-requester");
+  }
 
   const navLinkClassName = ({ isActive }: { isActive: boolean }) =>
     `app-shell__nav-link${isActive ? " app-shell__nav-link--active" : ""}`;
@@ -25,10 +35,13 @@ export default function AppShell({ children }: AppShellProps) {
           </NavLink>
         </nav>
 
-        {/* Issue #17 replaces this placeholder with the real selected Requester. */}
-        <span className="app-shell__requester">Requester Name</span>
+        <span className="app-shell__requester">{requester?.name ?? ""}</span>
 
-        <button type="button" className="btn btn--secondary app-shell__change-requester-btn">
+        <button
+          type="button"
+          className="btn btn--secondary app-shell__change-requester-btn"
+          onClick={handleChangeRequester}
+        >
           Change Requester
         </button>
 
