@@ -206,7 +206,8 @@ document must follow.
   `true`), `createdAt`.
 - **RelatedSystem** — `id`, `name` (unique), `isActive` (default `true`),
   `createdAt`. Mirrors the existing `Category` shape.
-- **Category** — unchanged from Lab 1.
+- **Category** — gains `isActive` (default `true`), because BR-17 and AC-07
+  require a Category to be deactivatable.
 - **Ticket** — `id`, `ticketNumber` (unique), `requesterId` (FK →
   RequesterUser), `categoryId` (FK → Category), `relatedSystemId` (FK →
   RelatedSystem), `summary`, `description`, `requestedPriority`
@@ -245,11 +246,9 @@ document must follow.
 
 ### Migration plan
 
-- `RequesterUser` and `RelatedSystem` ship in their own migrations, tied to
-  their respective Issues.
-- **Decision**: `Ticket` and `Attachment` ship in one shared migration, since
-  they are introduced by the same Create-Ticket Issue and Attachment has a
-  hard foreign-key dependency on Ticket that has no independent meaning.
+- **Decision**: all four models ship in one migration named `lab2_schema`,
+  tied to this Issue, because the seed requires Ticket rows to exist and
+  Attachment has a hard foreign-key dependency on Ticket.
 
 ### Seed data
 
