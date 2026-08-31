@@ -22,6 +22,10 @@ const RELATED_SYSTEM_NAMES = [
   "Printer Fleet",
 ];
 
+// Four active Requesters is the spec §7 minimum. The ~25/~5/0 ticket split
+// is defined over three of them (Alex, Sam, Priya), so Dana is the fourth
+// active Requester and holds no tickets. Priya is the one AC-13 uses for the
+// empty state; Dana exists so the selector dropdown has a fourth option.
 const REQUESTERS = [
   { name: "Alex Rivera", email: "alex.rivera@example.com", isActive: true },
   { name: "Sam Okafor", email: "sam.okafor@example.com", isActive: true },
