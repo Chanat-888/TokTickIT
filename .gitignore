@@ -7,6 +7,9 @@ node_modules/
 # build output
 dist/
 build/
+# compiled output emitted next to source by tsc
+client/src/**/*.js
+client/tests/**/*.js
 # prisma
 server/prisma/*.db
 # logs & OS
