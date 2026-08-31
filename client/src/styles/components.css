@@ -311,3 +311,163 @@
 .requester-select__continue-btn {
   align-self: flex-start;
 }
+
+/* ---------------------------------------------------------------------- */
+/* Form field — ui-spec.md §3, §4, §19                                    */
+/* ---------------------------------------------------------------------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.field__label {
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-label);
+  color: var(--color-text);
+}
+
+.field__required-marker {
+  color: var(--color-error);
+  margin-left: var(--space-xs);
+}
+
+.field__control {
+  height: var(--control-height);
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-field-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-body);
+}
+
+textarea.field__control {
+  height: auto;
+  min-height: 96px;
+  padding-top: var(--space-sm);
+  padding-bottom: var(--space-sm);
+  resize: vertical;
+}
+
+.field__control--readonly {
+  background: var(--color-readonly-bg);
+  border-color: var(--color-readonly-border);
+}
+
+.field__control--invalid {
+  border-color: var(--color-error);
+  border-width: 2px;
+}
+
+.field__control--disabled,
+.field__control:disabled {
+  background: var(--color-disabled-bg);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.field__message {
+  font-size: var(--font-size-small);
+  margin: 0;
+}
+
+.field__message--error {
+  color: var(--color-error);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Attachment picker — ui-spec.md §6, §19                                 */
+/* ---------------------------------------------------------------------- */
+
+.attachment-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.attachment-picker__dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl);
+  border: 2px dashed var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  text-align: center;
+}
+
+.attachment-picker__error {
+  color: var(--color-error);
+  font-size: var(--font-size-small);
+  margin: 0;
+}
+
+.attachment-picker__chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  font-size: var(--font-size-small);
+  list-style: none;
+}
+
+.attachment-picker__chip--invalid {
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+.attachment-picker__chip-remove {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: var(--font-size-body);
+  line-height: 1;
+  margin-left: auto;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Create Ticket — ui-spec.md §12, §8                                     */
+/* ---------------------------------------------------------------------- */
+
+.create-ticket {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.create-ticket__readonly-row,
+.create-ticket__classification-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-lg);
+}
+
+.create-ticket__actions {
+  display: flex;
+  gap: var(--space-md);
+}
+
+@media (max-width: 991px) {
+  .create-ticket__readonly-row,
+  .create-ticket__classification-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .create-ticket__readonly-row,
+  .create-ticket__classification-row {
+    grid-template-columns: 1fr;
+  }
+}
