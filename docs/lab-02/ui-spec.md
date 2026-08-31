@@ -313,10 +313,14 @@ Structure (top to bottom): a fixed header bar containing, left to right:
 3. Current Requester name (read-only text) with an adjacent
    "Change Requester" secondary-tier button.
 
-The active nav link is indicated two ways, never colour alone: a
-Secondary-green underline/bottom-border **and** `aria-current="page"`
+The active nav link is indicated two ways, never colour alone: a solid
+white underline/bottom-border **and** `aria-current="page"`
 (non-colour indication per specification.md §6/labsheet §8's
-"clear active-page indication").
+"clear active-page indication"). The underline is white rather than
+Secondary green because the header background is Primary green
+`#006B3C`, and Secondary green `#0B7A46` against it is too low-contrast
+to read as an indicator. The two-signal rule is unaffected: the
+presence or absence of the underline is itself a non-colour cue.
 
 "Change Requester" clears the stored selection (BR-07/BR-08) and routes
 back to the Development Requester Selection screen; no confirmation step
@@ -661,6 +665,7 @@ stable.
 | Shell | `.app-shell__requester` | Current-Requester name display |
 | Shell | `.app-shell__change-requester-btn` | Change Requester button |
 | Shell | `.app-shell__mobile-toggle` | Hamburger toggle (< 768px) |
+| Shell | `.app-shell--nav-open` | Root modifier while the mobile menu is expanded (§10) |
 | Requester Selection | `.requester-select` | Screen root |
 | Requester Selection | `.requester-select__dropdown` | The dropdown control |
 | Requester Selection | `.requester-select__continue-btn` | Continue button |
