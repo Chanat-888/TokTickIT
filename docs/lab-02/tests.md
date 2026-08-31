@@ -415,10 +415,12 @@ the new tests API-58–API-60 (§2.2).
 - **OQ-TEST-1**: The exact 400 response when `Idempotency-Key` is missing
   or malformed on `POST /api/tickets`. **Decision:** 400 with
   `{ errors: [{ "field": "Idempotency-Key", "message": "Missing or invalid
-  idempotency key" }] }`, added to the endpoint's field-validation 400
-  trigger table (api-spec.md §4, specification.md §8). **Reason:** keeps
-  `Idempotency-Key` validation inside the same body-validation shape already
-  used for every other `POST /api/tickets` field, rather than leaving it
+  idempotency key" }] }`, added as a 400 response row in api-spec.md §4,
+  alongside the `X-Requester-Id` header 400 and with the same exact-message
+  pattern (specification.md §8 fixes the condition; api-spec.md fixes the
+  wording). **Reason:** keeps
+  `Idempotency-Key` validation inside the same `{ field, message }` shape
+  already used for every other 400 on this endpoint, rather than leaving it
   undefined.
 - **OQ-TEST-2**: The response when a `DELETE .../attachments/:id` request's
   `reason` exceeds 200 characters. **Decision:** 400 with

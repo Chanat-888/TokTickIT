@@ -312,6 +312,7 @@ creation (BR-02).
 | 200 | Ticket representation (§0.3), identical to the original creation, no new row | replay of a previously used `Idempotency-Key` for this Requester (BR-11) |
 | 400 | `{ errors: [{ field, message }] }`, one entry per failing field | see table below |
 | 400 | `{ "errors": [{ "field": "X-Requester-Id", "message": "Missing or invalid requester header" }] }` | `X-Requester-Id` missing/non-integer (§0.1) |
+| 400 | `{ "errors": [{ "field": "Idempotency-Key", "message": "Missing or invalid idempotency key" }] }` | `Idempotency-Key` missing, or present but not a valid UUID (BR-11) |
 | 403 | `{ "error": "Selected Requester is not active" }` | `X-Requester-Id` valid integer but not an active Requester (§0.1) |
 | 500 | `{ "error": "Unexpected server error" }` | unexpected failure (§0.2) |
 
@@ -324,7 +325,11 @@ Field-validation 400 triggers:
 | `summary` | missing, or trimmed length outside 5–120 | BR-14, BR-15 |
 | `description` | missing, or trimmed length outside 10–2000 | BR-14, BR-16 |
 | `requestedPriority` | missing or not one of `LOW`/`MEDIUM`/`HIGH` | BR-18 |
-| `Idempotency-Key` | missing, or not a valid UUID | BR-11 |
+
+The two header 400s in the Responses table above (`X-Requester-Id`,
+`Idempotency-Key`) are not request-body fields, so they are listed there
+with their exact message rather than in this body-field table. Both are
+checked before any body field is validated.
 
 On any 400, no Ticket is created (BR-19); the client is responsible for
 preserving already-entered field values (a `ui-spec.md`/client concern, not
