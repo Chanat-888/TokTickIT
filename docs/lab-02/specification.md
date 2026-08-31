@@ -119,8 +119,12 @@ this sprint only, and is explicitly labeled as such everywhere it appears.
 - BR-22 The Ticket list can be filtered by Category, Requested Priority, and
   Current Status.
 - BR-23 The Ticket list can be sorted by Created Date, Summary, Requested
-  Priority, or Current Status; the default sort is Created Date descending with
-  Ticket id descending as a tiebreaker.
+  Priority, or Current Status; every sort applies Ticket id descending as a
+  tiebreaker, and the default sort is Created Date descending. The
+  tiebreaker is universal, not default-only, because Current Status is
+  single-valued in Lab 2, so any sort by Current Status ties on every row;
+  without a universal tiebreaker, pagination over a Current-Status sort
+  would be non-deterministic.
 - BR-24 Pagination is 1-based; default page size is 10; allowed page sizes are
   10, 20, 50; a page beyond the last available page returns an empty result set,
   not an error.
@@ -286,15 +290,17 @@ Headers: `X-Requester-Id`, `Idempotency-Key` (uuid).
 Body: `{ categoryId, relatedSystemId, summary, description, requestedPriority }`.
 - 201 — created: `{ id, ticketNumber, requesterId, categoryId, relatedSystemId, summary, description, requestedPriority, status, createdAt, updatedAt }`.
 - 200 — replay of a previously used `Idempotency-Key`: same shape, no new row created (BR-11).
-- 400 — missing/invalid field, or `categoryId`/`relatedSystemId` not active: `{ errors: [{ field, message }] }`.
+- 400 — missing/invalid field, `categoryId`/`relatedSystemId` not active, or
+  `Idempotency-Key` missing/not a valid UUID: `{ errors: [{ field, message }] }`.
 
 **GET /api/tickets**
-Query: `search`, `category`, `requestedPriority`, `status`, `sortBy`
+Query: `search`, `categoryId`, `requestedPriority`, `status`, `sortBy`
 (`createdAt`|`summary`|`requestedPriority`|`status`), `sortDir` (`asc`|`desc`),
 `page`, `pageSize` (10|20|50).
 - 200 — `{ data: Ticket[], page, pageSize, totalCount, totalPages }`. Out-of-range
   `page`/`pageSize` values are clamped, not rejected.
-- 400 — invalid `sortBy`, `sortDir`, `requestedPriority`, or `status` value.
+- 400 — invalid `categoryId`, `sortBy`, `sortDir`, `requestedPriority`, or
+  `status` value.
 
 **GET /api/tickets/:id**
 - 200 — Ticket fields plus `attachments: Attachment[]` (each including
@@ -333,6 +339,7 @@ regardless of which file caused the failure (BR-30).
 **DELETE /api/tickets/:ticketId/attachments/:attachmentId**
 Body: `{ reason?: string }` (≤200 chars).
 - 200 — updated metadata with `isRemoved: true`, `removedAt`, `removalReason`.
+- 400 — `reason` exceeds 200 characters: `{ errors: [{ field, message }] }`.
 - 404 — not found or not owned.
 - 409 — already removed.
 
