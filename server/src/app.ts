@@ -36,7 +36,7 @@ app.get("/api/categories", async (_req: Request, res: Response) => {
     // Log the real error server-side; send the client a message that leaks
     // nothing about the database or the query.
     console.error("GET /api/categories failed:", err);
-    res.status(500).json({ error: "Unable to load categories" });
+    res.status(500).json({ error: "Unexpected server error" });
   }
 });
 
