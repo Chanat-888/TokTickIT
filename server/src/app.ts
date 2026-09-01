@@ -419,6 +419,12 @@ const PAGE_SIZES = [10, 20, 50];
 function clampPageSize(raw: string | undefined): number {
   const n = Number(raw);
   if (!raw || !Number.isFinite(n)) return 10;
+  // On an exact tie (e.g. 15, equidistant from 10 and 20), reduce keeps
+  // whichever candidate it reaches first, which is the smaller one since
+  // PAGE_SIZES is ascending. Rounding down on a tie has no basis in
+  // api-spec.md §12 OQ-8 beyond "nearest allowed value" — it's simply this
+  // implementation's tie-break, made explicit here rather than left implicit
+  // in reduce's iteration order.
   return PAGE_SIZES.reduce((closest, candidate) =>
     Math.abs(candidate - n) < Math.abs(closest - n) ? candidate : closest,
   );
