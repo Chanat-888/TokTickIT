@@ -297,12 +297,20 @@ const MAX_ACTIVE_ATTACHMENTS = 5;
 
 // limits.files is set generously above 5 so a >5-file request reaches the
 // handler intact and can be reported as a 409, rather than being silently
-// truncated by multer.
-const upload = multer({ storage: multer.memoryStorage(), limits: { files: 20 } });
+// truncated by multer. limits.fileSize is a coarse abuse guard well above
+// the real 5MB limit below, so a file this large is rejected by multer
+// before being fully buffered into memory; anything between 5MB and 20MB
+// still passes multer and is caught by the manual 413 check.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { files: 20, fileSize: 20 * 1024 * 1024 },
+});
 
 // A malformed multipart body (or a non-multipart Content-Type) makes multer
 // call back with an error; treated as the 400 "malformed request" case
-// rather than an unhandled server error.
+// rather than an unhandled server error. This also covers a LIMIT_FILE_SIZE
+// error from the fileSize guard above — from the client's perspective it's
+// still just a bad request, not the 413 business-rule response below.
 function handleAttachmentUpload(req: Request, res: Response, next: NextFunction) {
   upload.array("files", 20)(req, res, (err: unknown) => {
     if (err) {
