@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import AppShell from "./components/AppShell.js";
 import RequesterSelect from "./screens/RequesterSelect.js";
 import CreateTicketForm from "./screens/CreateTicketForm.js";
+import MyTickets from "./screens/MyTickets.js";
 import { RequesterProvider, useRequester } from "./lib/requesterContext.js";
 
 // AC-02: /tickets, /tickets/new, /tickets/:id redirect here when nothing is
@@ -13,10 +14,6 @@ function RequireRequester({ children }: { children: ReactNode }) {
     return <Navigate to="/select-requester" replace />;
   }
   return <>{children}</>;
-}
-
-function MyTicketsPlaceholder() {
-  return <h1>My Tickets</h1>;
 }
 
 function TicketDetailPlaceholder() {
@@ -39,7 +36,7 @@ export default function App() {
             element={
               <RequireRequester>
                 <AppShell>
-                  <MyTicketsPlaceholder />
+                  <MyTickets />
                 </AppShell>
               </RequireRequester>
             }
