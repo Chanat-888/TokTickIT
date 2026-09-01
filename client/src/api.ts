@@ -186,3 +186,24 @@ export async function uploadAttachments(ticketId: number, files: File[]): Promis
   }
   return (await res.json()) as Attachment[];
 }
+
+// api-spec.md §0.3, §6 — the Ticket representation plus its Attachments.
+export interface TicketDetail extends Ticket {
+  attachments: Attachment[];
+}
+
+// Issue 20 — thrown by getTicket on a 404, so the screen can render the
+// not-found panel specifically rather than the generic failure banner
+// (BR-10, BR-36: missing vs. cross-Requester are indistinguishable).
+export class NotFoundError extends Error {}
+
+export async function getTicket(id: number): Promise<TicketDetail> {
+  const res = await apiFetch(`/api/tickets/${id}`);
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  if (!res.ok) {
+    throw new Error(`Ticket fetch failed with status ${res.status}`);
+  }
+  return (await res.json()) as TicketDetail;
+}
