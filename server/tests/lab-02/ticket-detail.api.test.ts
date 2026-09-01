@@ -191,6 +191,15 @@ describe("Ticket Detail", () => {
     expect(crossRequesterRes.body).toEqual({ error: "Not found" });
   });
 
+  it("GET /api/tickets/abc (non-numeric id) returns 404 with the same body as the other not-found cases", async () => {
+    const requester = await seedRequester("Alex Rivera", "alex@example.com");
+
+    const res = await request(app).get("/api/tickets/abc").set("X-Requester-Id", String(requester.id));
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: "Not found" });
+  });
+
   // API-36
   it("GET /api/tickets/:id without X-Requester-Id returns 400", async () => {
     const res = await request(app).get("/api/tickets/1");
