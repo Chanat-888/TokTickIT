@@ -407,4 +407,154 @@ app.post(
   },
 );
 
+// ---------------------------------------------------------------------------
+// Issue 19 — My Tickets list (api-spec.md §5)
+// ---------------------------------------------------------------------------
+
+const SORTABLE_FIELDS = new Set(["createdAt", "summary", "requestedPriority", "status"]);
+const SORT_DIRS = new Set(["asc", "desc"]);
+const PRIORITIES_FOR_FILTER = new Set(["LOW", "MEDIUM", "HIGH"]);
+const PAGE_SIZES = [10, 20, 50];
+
+function clampPageSize(raw: string | undefined): number {
+  const n = Number(raw);
+  if (!raw || !Number.isFinite(n)) return 10;
+  // On an exact tie (e.g. 15, equidistant from 10 and 20), reduce keeps
+  // whichever candidate it reaches first, which is the smaller one since
+  // PAGE_SIZES is ascending. Rounding down on a tie has no basis in
+  // api-spec.md §12 OQ-8 beyond "nearest allowed value" — it's simply this
+  // implementation's tie-break, made explicit here rather than left implicit
+  // in reduce's iteration order.
+  return PAGE_SIZES.reduce((closest, candidate) =>
+    Math.abs(candidate - n) < Math.abs(closest - n) ? candidate : closest,
+  );
+}
+
+function clampPage(raw: string | undefined): number {
+  const n = Number(raw);
+  if (!raw || !Number.isFinite(n)) return 1;
+  const truncated = Math.trunc(n);
+  return truncated < 1 ? 1 : truncated;
+}
+
+app.get("/api/tickets", async (req: Request, res: Response) => {
+  try {
+    const requesterCheck = await checkRequester(req);
+    if (!requesterCheck.ok) {
+      return res.status(requesterCheck.status).json(requesterCheck.body);
+    }
+    const { requesterId } = requesterCheck;
+
+    const errors: { field: string; message: string }[] = [];
+
+    // categoryId — 400 if not an integer, or an integer that doesn't
+    // reference ANY existing Category row, active or not (api-spec.md §12
+    // OQ-2 — different from POST /api/tickets' active-row check).
+    let categoryId: number | undefined;
+    if (req.query.categoryId !== undefined) {
+      const raw = String(req.query.categoryId);
+      if (!/^\d+$/.test(raw)) {
+        errors.push({ field: "categoryId", message: "categoryId must be an integer" });
+      } else {
+        const id = Number(raw);
+        const category = await getPrisma().category.findUnique({ where: { id } });
+        if (!category) {
+          errors.push({ field: "categoryId", message: "categoryId does not reference a known Category" });
+        } else {
+          categoryId = id;
+        }
+      }
+    }
+
+    let requestedPriority: "LOW" | "MEDIUM" | "HIGH" | undefined;
+    if (req.query.requestedPriority !== undefined) {
+      const raw = String(req.query.requestedPriority);
+      if (!PRIORITIES_FOR_FILTER.has(raw)) {
+        errors.push({ field: "requestedPriority", message: "Requested Priority must be LOW, MEDIUM, or HIGH" });
+      } else {
+        requestedPriority = raw as "LOW" | "MEDIUM" | "HIGH";
+      }
+    }
+
+    let status: "NEW" | undefined;
+    if (req.query.status !== undefined) {
+      const raw = String(req.query.status);
+      if (raw !== "NEW") {
+        errors.push({ field: "status", message: "Status must be NEW" });
+      } else {
+        status = "NEW";
+      }
+    }
+
+    let sortBy: "createdAt" | "summary" | "requestedPriority" | "status" = "createdAt";
+    if (req.query.sortBy !== undefined) {
+      const raw = String(req.query.sortBy);
+      if (!SORTABLE_FIELDS.has(raw)) {
+        errors.push({ field: "sortBy", message: "sortBy must be one of createdAt, summary, requestedPriority, status" });
+      } else {
+        sortBy = raw as typeof sortBy;
+      }
+    }
+
+    let sortDir: "asc" | "desc" = "desc";
+    if (req.query.sortDir !== undefined) {
+      const raw = String(req.query.sortDir);
+      if (!SORT_DIRS.has(raw)) {
+        errors.push({ field: "sortDir", message: "sortDir must be asc or desc" });
+      } else {
+        sortDir = raw as typeof sortDir;
+      }
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({ errors });
+    }
+
+    // BR-24, api-spec.md §12 OQ-8 — clamped, never rejected.
+    const page = clampPage(req.query.page !== undefined ? String(req.query.page) : undefined);
+    const pageSize = clampPageSize(req.query.pageSize !== undefined ? String(req.query.pageSize) : undefined);
+
+    const search = req.query.search !== undefined ? String(req.query.search) : undefined;
+
+    const where: Prisma.TicketWhereInput = { requesterId };
+    if (categoryId !== undefined) where.categoryId = categoryId;
+    if (requestedPriority !== undefined) where.requestedPriority = requestedPriority;
+    if (status !== undefined) where.status = status;
+    if (search) {
+      where.OR = [
+        { ticketNumber: { startsWith: search } },
+        { summary: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    // api-spec.md §12 OQ-7 — id-descending tiebreaker on every sort, not
+    // only the default.
+    const orderBy: Prisma.TicketOrderByWithRelationInput[] = [
+      { [sortBy]: sortDir },
+      { id: "desc" },
+    ];
+
+    const [totalCount, tickets] = await Promise.all([
+      getPrisma().ticket.count({ where }),
+      getPrisma().ticket.findMany({
+        where,
+        orderBy,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+
+    return res.status(200).json({
+      data: tickets.map(ticketToJSON),
+      page,
+      pageSize,
+      totalCount,
+      totalPages: Math.ceil(totalCount / pageSize),
+    });
+  } catch (err) {
+    console.error("GET /api/tickets failed:", err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
 export default app;

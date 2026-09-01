@@ -127,6 +127,49 @@ export async function createTicket(
   throw new Error(`Create ticket failed with status ${res.status}`);
 }
 
+// api-spec.md §5 — the shared pagination-metadata shape.
+export interface TicketListResult {
+  data: Ticket[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface TicketListParams {
+  search?: string;
+  categoryId?: number;
+  requestedPriority?: Priority;
+  status?: "NEW";
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+  page?: number;
+  pageSize?: number;
+}
+
+// Issue 19 — My Tickets list (api-spec.md §5). Every control on this screen
+// only ever sends values it itself defined, so a 400 here is a programming
+// error, not user input to fix inline — thrown like any other non-2xx
+// status rather than returned as data.
+export async function getTickets(params: TicketListParams): Promise<TicketListResult> {
+  const query = new URLSearchParams();
+  if (params.search !== undefined) query.set("search", params.search);
+  if (params.categoryId !== undefined) query.set("categoryId", String(params.categoryId));
+  if (params.requestedPriority !== undefined) query.set("requestedPriority", params.requestedPriority);
+  if (params.status !== undefined) query.set("status", params.status);
+  if (params.sortBy !== undefined) query.set("sortBy", params.sortBy);
+  if (params.sortDir !== undefined) query.set("sortDir", params.sortDir);
+  if (params.page !== undefined) query.set("page", String(params.page));
+  if (params.pageSize !== undefined) query.set("pageSize", String(params.pageSize));
+
+  const qs = query.toString();
+  const res = await apiFetch(`/api/tickets${qs ? `?${qs}` : ""}`);
+  if (!res.ok) {
+    throw new Error(`Tickets fetch failed with status ${res.status}`);
+  }
+  return (await res.json()) as TicketListResult;
+}
+
 // Issue 18 — upload up to 5 files to an existing owned Ticket
 // (api-spec.md §7, upload only). Throws on any non-2xx status; a failed
 // upload doesn't fail the Ticket that was already created (BR-20).

@@ -471,3 +471,195 @@ textarea.field__control {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------------------------------------------------------------------- */
+/* My Tickets — ui-spec.md §13, §19                                       */
+/* ---------------------------------------------------------------------- */
+
+.my-tickets {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.ticket-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.ticket-toolbar__search {
+  height: var(--control-height);
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-field-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-body);
+  flex: 1 1 240px;
+  min-width: 180px;
+}
+
+.ticket-toolbar__filter,
+.ticket-toolbar__page-size,
+.ticket-toolbar__sort-select {
+  height: var(--control-height);
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-field-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-body);
+}
+
+.ticket-toolbar__sort-select {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------- */
+/* My Tickets — desktop table (>= 768px)                                  */
+/* ---------------------------------------------------------------------- */
+
+.ticket-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.ticket-table th,
+.ticket-table td {
+  padding: var(--space-sm) var(--space-md);
+  text-align: left;
+  border-bottom: 1px solid var(--color-field-border);
+  font-size: var(--font-size-body);
+}
+
+.ticket-table__header--sortable {
+  padding: 0;
+}
+
+.ticket-table__header--sortable .btn {
+  height: auto;
+  padding: var(--space-sm) var(--space-md);
+}
+
+.ticket-table__sort-icon {
+  margin-left: var(--space-xs);
+}
+
+.ticket-table__row {
+  cursor: pointer;
+}
+
+.ticket-table__row:hover {
+  background: var(--color-pale-green);
+}
+
+.ticket-table__row--skeleton td {
+  background: var(--color-disabled-bg);
+  height: var(--control-height);
+}
+
+.ticket-card-list {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------- */
+/* My Tickets — mobile cards (< 768px)                                    */
+/* ---------------------------------------------------------------------- */
+
+.ticket-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-lg);
+  border: 1px solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.ticket-card--skeleton {
+  min-height: 96px;
+  background: var(--color-disabled-bg);
+  cursor: default;
+}
+
+.ticket-card__header-row,
+.ticket-card__secondary-row,
+.ticket-card__footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.ticket-card__ticket-number {
+  font-weight: 600;
+}
+
+.ticket-card__title {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: break-word;
+}
+
+.ticket-card__footer-row {
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+
+.ticket-card__footer-label {
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------- */
+/* My Tickets — pagination (§13.5, §19)                                   */
+/* ---------------------------------------------------------------------- */
+
+.ticket-list__pagination-summary {
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.pagination__page-btn--active {
+  background: var(--color-primary-green);
+  color: #ffffff;
+  border-radius: var(--radius-control);
+}
+
+/* ---------------------------------------------------------------------- */
+/* My Tickets — responsive breakpoint (ui-spec.md §8, §13.3, §13.4)       */
+/* ---------------------------------------------------------------------- */
+
+@media (max-width: 767px) {
+  .ticket-table {
+    display: none;
+  }
+
+  .ticket-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .ticket-toolbar__sort-select {
+    display: inline-flex;
+  }
+}
