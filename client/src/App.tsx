@@ -4,6 +4,7 @@ import AppShell from "./components/AppShell.js";
 import RequesterSelect from "./screens/RequesterSelect.js";
 import CreateTicketForm from "./screens/CreateTicketForm.js";
 import MyTickets from "./screens/MyTickets.js";
+import TicketDetail from "./screens/TicketDetail.js";
 import { RequesterProvider, useRequester } from "./lib/requesterContext.js";
 
 // AC-02: /tickets, /tickets/new, /tickets/:id redirect here when nothing is
@@ -14,10 +15,6 @@ function RequireRequester({ children }: { children: ReactNode }) {
     return <Navigate to="/select-requester" replace />;
   }
   return <>{children}</>;
-}
-
-function TicketDetailPlaceholder() {
-  return <h1>Ticket Detail</h1>;
 }
 
 function NotFoundPlaceholder() {
@@ -56,7 +53,7 @@ export default function App() {
             element={
               <RequireRequester>
                 <AppShell>
-                  <TicketDetailPlaceholder />
+                  <TicketDetail />
                 </AppShell>
               </RequireRequester>
             }

@@ -663,3 +663,75 @@ textarea.field__control {
     display: inline-flex;
   }
 }
+
+/* ---------------------------------------------------------------------- */
+/* Ticket Detail — ui-spec.md §16, §17, §19                               */
+/* ---------------------------------------------------------------------- */
+
+.ticket-detail {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.ticket-detail__back-link {
+  align-self: flex-start;
+}
+
+.ticket-detail__header {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-lg);
+  padding: var(--space-xl);
+  background: var(--color-surface);
+  border-radius: var(--radius-control);
+}
+
+.ticket-detail__attachments {
+  padding: var(--space-xl);
+  background: var(--color-surface);
+  border-radius: var(--radius-control);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.attachment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.attachment-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.attachment-item--active {
+  opacity: 1;
+}
+
+.attachment-item--removed {
+  opacity: 0.6;
+}
+
+.attachment-item__name {
+  font-weight: 600;
+}
+
+.attachment-item__meta {
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}

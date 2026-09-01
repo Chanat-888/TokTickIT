@@ -557,4 +557,42 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Issue 20 — Ticket Detail (api-spec.md §6)
+// ---------------------------------------------------------------------------
+app.get("/api/tickets/:id", async (req: Request, res: Response) => {
+  try {
+    const requesterCheck = await checkRequester(req);
+    if (!requesterCheck.ok) {
+      return res.status(requesterCheck.status).json(requesterCheck.body);
+    }
+    const { requesterId } = requesterCheck;
+
+    // Not an integer id — treated as not-found, not a 400 (api-spec.md §6,
+    // this endpoint defines no 400 case).
+    if (!/^\d+$/.test(req.params.id)) {
+      return res.status(404).json({ error: "Not found" });
+    }
+    const ticketId = Number(req.params.id);
+
+    const ticket = await getPrisma().ticket.findUnique({ where: { id: ticketId } });
+    if (!ticket || ticket.requesterId !== requesterId) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const attachments = await getPrisma().attachment.findMany({
+      where: { ticketId },
+      orderBy: { id: "asc" },
+    });
+
+    return res.status(200).json({
+      ...ticketToJSON(ticket),
+      attachments: attachments.map(attachmentToJSON),
+    });
+  } catch (err) {
+    console.error(`GET /api/tickets/${req.params.id} failed:`, err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
 export default app;
