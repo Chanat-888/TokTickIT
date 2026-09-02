@@ -82,10 +82,10 @@ function parseTotalCount(summaryText: string): number {
   return Number(match[1]);
 }
 
-// Alex Rivera is the seeded ~25-ticket Requester, but the exact count can be
-// one or more higher if an earlier test in this run (e.g. E2E-01) created a
-// new ticket for them — so the initial total is read from the page rather
-// than hardcoded, and every later assertion compares against it.
+// Alex Rivera is the seeded 25-ticket Requester. Global setup truncates and
+// reseeds the DB before this run, and E2E-01 (which runs earlier in this
+// file, single-worker) deterministically adds one more ticket for Alex —
+// so the exact total at this point is always 25 + 1 = 26.
 test("E2E-04 My Tickets search, filter, sort, and pagination work end-to-end", async ({ page }) => {
   await selectRequester(page, "Alex Rivera");
   await page.goto("/tickets");
@@ -93,7 +93,7 @@ test("E2E-04 My Tickets search, filter, sort, and pagination work end-to-end", a
   await expect(page.locator(".ticket-table__row")).toHaveCount(10);
   const initialSummary = await page.locator(".ticket-list__pagination-summary").innerText();
   const initialTotal = parseTotalCount(initialSummary);
-  expect(initialTotal).toBeGreaterThanOrEqual(25);
+  expect(initialTotal).toBe(26);
 
   // Search: narrow by a known seeded ticket number's full value.
   const firstTicketNumber = await page

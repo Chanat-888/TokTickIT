@@ -5,6 +5,10 @@ import { defineConfig, devices } from "@playwright/test";
 // server/, not nested inside either.
 export default defineConfig({
   testDir: "./lab-02",
+  // Runs once, before either webServer boots (Playwright always runs
+  // globalSetup first), truncating and reseeding the dev DB so every run
+  // starts from the same 25/5/0 ticket split instead of an ever-growing DB.
+  globalSetup: "./global-setup.ts",
   // Both spec files exercise the same seeded dev DB (attachment add/remove,
   // Requester switching) — running them concurrently would race on shared
   // state, so this suite runs single-worker rather than parallelized.
