@@ -128,8 +128,11 @@ async function main() {
     ticketCounts[requesterName] += 1;
   }
 
-  const totalTickets = await prisma.ticket.count();
-  console.log(`Seed complete — ${totalTickets} tickets:`);
+  // Report the count from this seed's own plan (25 + 5 = 30), not a raw
+  // DB count — prisma.ticket.count() would include any tickets created
+  // separately (e.g. by the Playwright E2E suite against this same dev
+  // database), which is real data but not part of what this seed run did.
+  console.log(`Seed complete — ${ticketPlan.length} tickets:`);
   for (const [name, count] of Object.entries(ticketCounts)) {
     console.log(`  ${name}: ${count}`);
   }
