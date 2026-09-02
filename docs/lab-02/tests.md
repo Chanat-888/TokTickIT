@@ -272,11 +272,11 @@ expands to `desktop`, `tablet`, or `mobile`.
 
 | Screen | Desktop (≥992px) | Tablet (768–991px) | Mobile (<768px) | Screenshot path(s) | Verified |
 |---|---|---|---|---|---|
-| Requester Selection | loading, loaded, empty, failure | — | — | `create-ticket/requester-select-{state}-desktop.png` | |
-| Create Ticket | 2-column grid | 2-column, Summary/Description full-width rows | 1 column, Attachments below main fields | `create-ticket/create-ticket-initial-{viewport}.png` (+ validation/submitting/success/failure/invalid-attachment, desktop only) | |
-| My Tickets | 7-column table | table, narrower columns, Category may abbreviate | `.ticket-card` stacked cards, no horizontal scroll | `my-tickets/my-tickets-list-{viewport}.png` (+ loading/empty/no-results/failure/requester-switch, desktop only) | |
-| Ticket Detail | 4-column header grid | 2-column header grid | 1-column header, Attachments always full-width | `ticket-detail/ticket-detail-loaded-{viewport}.png` (+ removed-attachment/remove-confirm/not-found, desktop only) | |
-| App shell | full horizontal nav | full horizontal nav | hamburger toggle, stacked full-width menu | covered within each screen's own screenshots above | |
+| Requester Selection | loading, loaded, empty, failure | — | — | `create-ticket/requester-select-{state}-desktop.png` | [x] |
+| Create Ticket | 2-column grid | 2-column, Summary/Description full-width rows | 1 column, Attachments below main fields | `create-ticket/create-ticket-initial-{viewport}.png` (+ validation/submitting/success/failure/invalid-attachment, desktop only) | [x] |
+| My Tickets | 7-column table | table, narrower columns, Category may abbreviate | `.ticket-card` stacked cards, no horizontal scroll | `my-tickets/my-tickets-list-{viewport}.png` (+ loading/empty/no-results/failure/requester-switch, desktop only) | [x] |
+| Ticket Detail | 4-column header grid | 2-column header grid | 1-column header, Attachments always full-width | `ticket-detail/ticket-detail-loaded-{viewport}.png` (+ removed-attachment/remove-confirm/not-found, desktop only) | [x] |
+| App shell | full horizontal nav | full horizontal nav | hamburger toggle, stacked full-width menu | covered within each screen's own screenshots above | [x] |
 
 Non-viewport visual checks (all asserted via `RESP-*`/`STYLE-*` and manually
 reviewed against the screenshots above, per specification.md §10's "visually
