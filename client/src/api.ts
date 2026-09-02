@@ -1,4 +1,5 @@
 import { API_URL, apiFetch } from "./lib/apiClient.js";
+import { getSelectedRequester } from "./lib/requesterContext.js";
 
 export interface Category {
   id: number;
@@ -206,4 +207,52 @@ export async function getTicket(id: number): Promise<TicketDetail> {
     throw new Error(`Ticket fetch failed with status ${res.status}`);
   }
   return (await res.json()) as TicketDetail;
+}
+
+// Issue 21 — one Attachment's metadata (api-spec.md §8). Used before a
+// Preview/Download navigation to check whether the attachment was removed
+// since the Ticket was last loaded (ui-spec.md §17 "Unavailable" state).
+export async function getAttachment(ticketId: number, attachmentId: number): Promise<Attachment> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/attachments/${attachmentId}`);
+  if (!res.ok) {
+    throw new Error(`Attachment fetch failed with status ${res.status}`);
+  }
+  return (await res.json()) as Attachment;
+}
+
+// Issue 21 — builds the absolute download URL (api-spec.md §9), used as a
+// plain <a href> so the file opens/downloads directly in the browser rather
+// than being fetched-then-blobbed (BR-35). A plain link navigation can't
+// carry the X-Requester-Id header apiFetch normally attaches, so — as a
+// deviation scoped to this one endpoint only — the requester id is appended
+// as a `requesterId` query param instead; the server route accepts either
+// (api-spec.md §9, TASK 4 of Issue #21).
+export function downloadAttachmentUrl(ticketId: number, attachmentId: number): string {
+  const requester = getSelectedRequester();
+  const query = requester ? `?requesterId=${requester.id}` : "";
+  return `${API_URL}/api/tickets/${ticketId}/attachments/${attachmentId}/download${query}`;
+}
+
+// Issue 21 — thrown by removeAttachment on a 409, so the UI can show a
+// specific "already removed" message if that race occurs.
+export class AlreadyRemovedError extends Error {}
+
+// Issue 21 — soft-remove an Attachment (api-spec.md §10, BR-31/BR-34).
+export async function removeAttachment(
+  ticketId: number,
+  attachmentId: number,
+  reason?: string,
+): Promise<Attachment> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/attachments/${attachmentId}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(reason !== undefined ? { reason } : {}),
+  });
+  if (res.status === 409) {
+    throw new AlreadyRemovedError("Attachment already removed");
+  }
+  if (!res.ok) {
+    throw new Error(`Attachment removal failed with status ${res.status}`);
+  }
+  return (await res.json()) as Attachment;
 }

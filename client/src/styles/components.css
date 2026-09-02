@@ -710,9 +710,8 @@ textarea.field__control {
 
 .attachment-item {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
+  flex-direction: column;
+  gap: var(--space-sm);
   padding: var(--space-sm) var(--space-md);
   border: 1px solid var(--color-field-border);
   border-radius: var(--radius-control);
@@ -734,4 +733,26 @@ textarea.field__control {
 .attachment-item__meta {
   font-size: var(--font-size-small);
   color: var(--color-text-muted);
+}
+
+.attachment-item__preview-btn,
+.attachment-item__download-btn,
+.attachment-item__remove-btn {
+  white-space: nowrap;
+}
+
+.attachment-item__preview-btn[aria-disabled="true"],
+.attachment-item__download-btn[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.attachment-remove-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-page-bg);
 }
