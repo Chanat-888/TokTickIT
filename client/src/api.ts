@@ -212,8 +212,13 @@ export async function getTicket(id: number): Promise<TicketDetail> {
 // Issue 21 — one Attachment's metadata (api-spec.md §8). Used before a
 // Preview/Download navigation to check whether the attachment was removed
 // since the Ticket was last loaded (ui-spec.md §17 "Unavailable" state).
+export class AttachmentNotFoundError extends Error {}
+
 export async function getAttachment(ticketId: number, attachmentId: number): Promise<Attachment> {
   const res = await apiFetch(`/api/tickets/${ticketId}/attachments/${attachmentId}`);
+  if (res.status === 404) {
+    throw new AttachmentNotFoundError("Not found");
+  }
   if (!res.ok) {
     throw new Error(`Attachment fetch failed with status ${res.status}`);
   }

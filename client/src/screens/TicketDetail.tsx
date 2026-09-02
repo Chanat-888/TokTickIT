@@ -9,6 +9,7 @@ import {
 import { Link, useParams } from "react-router-dom";
 import {
   AlreadyRemovedError,
+  AttachmentNotFoundError,
   downloadAttachmentUrl,
   getAttachment,
   getCategories,
@@ -306,27 +307,36 @@ export default function TicketDetail() {
     e.preventDefault();
     if (!ticket || disabledAttachmentIds.has(attachment.id)) return;
 
+    const markUnavailable = () => {
+      setUnavailableMessages((prev) => ({
+        ...prev,
+        [attachment.id]: "This attachment is no longer available.",
+      }));
+      setDisabledAttachmentIds((prev) => new Set(prev).add(attachment.id));
+      window.setTimeout(() => {
+        setUnavailableMessages((prev) => {
+          if (!(attachment.id in prev)) return prev;
+          const next = { ...prev };
+          delete next[attachment.id];
+          return next;
+        });
+      }, 4000);
+    };
+
     try {
       const meta = await getAttachment(ticket.id, attachment.id);
       if (meta.isRemoved) {
-        setUnavailableMessages((prev) => ({
-          ...prev,
-          [attachment.id]: "This attachment is no longer available.",
-        }));
-        setDisabledAttachmentIds((prev) => new Set(prev).add(attachment.id));
-        window.setTimeout(() => {
-          setUnavailableMessages((prev) => {
-            if (!(attachment.id in prev)) return prev;
-            const next = { ...prev };
-            delete next[attachment.id];
-            return next;
-          });
-        }, 4000);
+        markUnavailable();
         return;
       }
-    } catch {
-      // The pre-check itself failed (e.g. network error) — fall through and
-      // let the real download endpoint be the source of truth.
+    } catch (err) {
+      if (err instanceof AttachmentNotFoundError) {
+        markUnavailable();
+        return;
+      }
+      // The pre-check itself failed for an unrelated reason (e.g. network
+      // error) — fall through and let the real download endpoint be the
+      // source of truth.
     }
 
     const url = downloadAttachmentUrl(ticket.id, attachment.id);
