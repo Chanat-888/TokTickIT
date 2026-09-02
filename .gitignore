@@ -16,6 +16,9 @@ client/src/**/*.js
 client/tests/**/*.js
 # prisma
 server/prisma/*.db
+# Playwright run artifacts (e2e/lab-02/screenshots/ is committed evidence, not this)
+e2e/test-results/
+e2e/playwright-report/
 # logs & OS
 *.log
 .DS_Store
