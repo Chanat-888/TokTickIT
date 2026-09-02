@@ -330,4 +330,41 @@ describe("Create Ticket", () => {
     const fields = res.body.errors.map((e: { field: string }) => e.field).sort();
     expect(fields).toEqual(["description", "summary"]);
   });
+
+  // API-58
+  it("POST /api/tickets without an Idempotency-Key header returns 400 and creates no Ticket", async () => {
+    await seedCategory("Hardware");
+    await seedRelatedSystem("Email");
+    const requester = await seedRequester("Alex Rivera", "alex@example.com");
+
+    const res = await request(app)
+      .post("/api/tickets")
+      .set("X-Requester-Id", String(requester.id))
+      .send(validBody());
+
+    expect(res.status).toBe(400);
+    expect(res.body.errors).toEqual([
+      { field: "Idempotency-Key", message: "Missing or invalid idempotency key" },
+    ]);
+    expect(await getPrisma().ticket.count()).toBe(0);
+  });
+
+  // API-59
+  it("POST /api/tickets with an Idempotency-Key that isn't a valid UUID returns 400 and creates no Ticket", async () => {
+    await seedCategory("Hardware");
+    await seedRelatedSystem("Email");
+    const requester = await seedRequester("Alex Rivera", "alex@example.com");
+
+    const res = await request(app)
+      .post("/api/tickets")
+      .set("X-Requester-Id", String(requester.id))
+      .set("Idempotency-Key", "abc")
+      .send(validBody());
+
+    expect(res.status).toBe(400);
+    expect(res.body.errors).toEqual([
+      { field: "Idempotency-Key", message: "Missing or invalid idempotency key" },
+    ]);
+    expect(await getPrisma().ticket.count()).toBe(0);
+  });
 });

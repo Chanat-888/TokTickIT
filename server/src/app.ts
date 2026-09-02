@@ -2,11 +2,13 @@ import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import multer from "multer";
 import path from "node:path";
+import { createReadStream } from "node:fs";
+import { stat } from "node:fs/promises";
 import { Prisma, type Ticket, type Attachment } from "@prisma/client";
 import { getPrisma } from "./prisma.js";
 import { generateTicketNumber } from "./ticketNumber.js";
 import { validateTicketInput } from "./ticketValidation.js";
-import { storeUploadedFile } from "./uploads.js";
+import { storeUploadedFile, UPLOADS_DIR } from "./uploads.js";
 // getPrisma() is your lazy database handle. Call it INSIDE a route when you
 // need the DB.
 
@@ -83,8 +85,20 @@ type RequesterCheck =
       body: { errors: { field: string; message: string }[] } | { error: string };
     };
 
-async function checkRequester(req: Request): Promise<RequesterCheck> {
-  const raw = req.header("X-Requester-Id");
+// `allowQueryFallback` is a deviation scoped to the attachment download
+// route only (api-spec.md §9, TASK 4 of Issue #21): a plain <a href> can't
+// carry a custom header on browser navigation, so that one route also
+// accepts a `?requesterId=` query param when the header is absent. The
+// header still wins whenever both are present.
+async function checkRequester(
+  req: Request,
+  options?: { allowQueryFallback?: boolean },
+): Promise<RequesterCheck> {
+  let raw = req.header("X-Requester-Id");
+  if (raw === undefined && options?.allowQueryFallback) {
+    const queryValue = req.query.requesterId;
+    if (typeof queryValue === "string") raw = queryValue;
+  }
   const requesterId = raw !== undefined && /^\d+$/.test(raw.trim()) ? Number(raw.trim()) : NaN;
   if (!Number.isInteger(requesterId)) {
     return {
@@ -594,5 +608,168 @@ app.get("/api/tickets/:id", async (req: Request, res: Response) => {
     res.status(500).json({ error: "Unexpected server error" });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Issue 21 — Attachment metadata, download/preview, soft-removal
+// (api-spec.md §8, §9, §10)
+// ---------------------------------------------------------------------------
+
+// Shared by all three routes below: resolves the Attachment (with its parent
+// Ticket) and checks it exists, belongs to the caller, and that the
+// ticketId in the URL actually matches the attachment's own ticket — a
+// malformed/non-integer id is treated as not-found, matching the existing
+// GET /api/tickets/:id convention.
+async function findOwnedAttachment(
+  ticketIdParam: string,
+  attachmentIdParam: string,
+  requesterId: number,
+): Promise<(Attachment & { ticket: Ticket }) | null> {
+  if (!/^\d+$/.test(ticketIdParam) || !/^\d+$/.test(attachmentIdParam)) {
+    return null;
+  }
+  const ticketId = Number(ticketIdParam);
+  const attachmentId = Number(attachmentIdParam);
+  const attachment = await getPrisma().attachment.findUnique({
+    where: { id: attachmentId },
+    include: { ticket: true },
+  });
+  if (!attachment || attachment.ticketId !== ticketId || attachment.ticket.requesterId !== requesterId) {
+    return null;
+  }
+  return attachment;
+}
+
+// api-spec.md §8 — metadata only, never the file body; a removed Attachment
+// still 404s BR-10's ownership checks the same as any other, but does NOT
+// 404 for being removed (that rule is download-specific, §9).
+app.get(
+  "/api/tickets/:ticketId/attachments/:attachmentId",
+  async (req: Request, res: Response) => {
+    try {
+      const requesterCheck = await checkRequester(req);
+      if (!requesterCheck.ok) {
+        return res.status(requesterCheck.status).json(requesterCheck.body);
+      }
+
+      const attachment = await findOwnedAttachment(
+        req.params.ticketId,
+        req.params.attachmentId,
+        requesterCheck.requesterId,
+      );
+      if (!attachment) {
+        return res.status(404).json({ error: "Not found" });
+      }
+
+      return res.status(200).json(attachmentToJSON(attachment));
+    } catch (err) {
+      console.error(
+        `GET /api/tickets/${req.params.ticketId}/attachments/${req.params.attachmentId} failed:`,
+        err,
+      );
+      res.status(500).json({ error: "Unexpected server error" });
+    }
+  },
+);
+
+// api-spec.md §9 — streams the file; also serves as "preview" per BR-35. A
+// removed Attachment 404s here even for its own owner (BR-32, AC-21) — the
+// only one of the three routes where isRemoved changes the response.
+app.get(
+  "/api/tickets/:ticketId/attachments/:attachmentId/download",
+  async (req: Request, res: Response) => {
+    try {
+      const requesterCheck = await checkRequester(req, { allowQueryFallback: true });
+      if (!requesterCheck.ok) {
+        return res.status(requesterCheck.status).json(requesterCheck.body);
+      }
+
+      const attachment = await findOwnedAttachment(
+        req.params.ticketId,
+        req.params.attachmentId,
+        requesterCheck.requesterId,
+      );
+      if (!attachment || attachment.removedAt !== null) {
+        return res.status(404).json({ error: "Not found" });
+      }
+
+      const filePath = path.join(UPLOADS_DIR, attachment.storedFilename);
+      try {
+        await stat(filePath);
+      } catch {
+        // A DB row with no matching file on disk is an unexpected server-side
+        // inconsistency, not "no such attachment for you" — 500, not 404.
+        console.error(`Attachment file missing from disk: ${filePath}`);
+        return res.status(500).json({ error: "Unexpected server error" });
+      }
+
+      res.setHeader("Content-Type", attachment.mimeType);
+      const stream = createReadStream(filePath);
+      stream.on("error", (streamErr) => {
+        console.error(`Attachment stream failed for ${filePath}:`, streamErr);
+        if (!res.headersSent) res.status(500).json({ error: "Unexpected server error" });
+      });
+      stream.pipe(res);
+    } catch (err) {
+      console.error(
+        `GET /api/tickets/${req.params.ticketId}/attachments/${req.params.attachmentId}/download failed:`,
+        err,
+      );
+      res.status(500).json({ error: "Unexpected server error" });
+    }
+  },
+);
+
+// api-spec.md §10 — soft-remove: sets removedAt/removalReason, never deletes
+// the underlying file (BR-31), and never touches server/src/uploads.ts.
+app.delete(
+  "/api/tickets/:ticketId/attachments/:attachmentId",
+  async (req: Request, res: Response) => {
+    try {
+      const requesterCheck = await checkRequester(req);
+      if (!requesterCheck.ok) {
+        return res.status(requesterCheck.status).json(requesterCheck.body);
+      }
+
+      // BR-34 — checked on the raw length, no trimming (api-spec.md §8
+      // OQ-TEST-2 / API-60); checked before the 404 ownership lookup, same
+      // 400-before-404 convention as upload (api-spec.md §12 OQ-9).
+      const body = (req.body ?? {}) as { reason?: unknown };
+      const reason = typeof body.reason === "string" ? body.reason : undefined;
+      if (reason !== undefined && reason.length > 200) {
+        return res.status(400).json({
+          errors: [{ field: "reason", message: "Reason must be 200 characters or fewer" }],
+        });
+      }
+
+      const attachment = await findOwnedAttachment(
+        req.params.ticketId,
+        req.params.attachmentId,
+        requesterCheck.requesterId,
+      );
+      if (!attachment) {
+        return res.status(404).json({ error: "Not found" });
+      }
+
+      if (attachment.removedAt !== null) {
+        return res.status(409).json({ error: "Attachment already removed" });
+      }
+
+      const updated = await getPrisma().attachment.update({
+        where: { id: attachment.id },
+        data: { removedAt: new Date(), removalReason: reason ?? null },
+      });
+      // BR-39: removal also touches the parent Ticket's updatedAt.
+      await getPrisma().ticket.update({ where: { id: attachment.ticketId }, data: {} });
+
+      return res.status(200).json(attachmentToJSON(updated));
+    } catch (err) {
+      console.error(
+        `DELETE /api/tickets/${req.params.ticketId}/attachments/${req.params.attachmentId} failed:`,
+        err,
+      );
+      res.status(500).json({ error: "Unexpected server error" });
+    }
+  },
+);
 
 export default app;
