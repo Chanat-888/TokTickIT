@@ -128,11 +128,18 @@ async function main() {
     ticketCounts[requesterName] += 1;
   }
 
-  // Report the count from this seed's own plan (25 + 5 = 30), not a raw
-  // DB count — prisma.ticket.count() would include any tickets created
-  // separately (e.g. by the Playwright E2E suite against this same dev
-  // database), which is real data but not part of what this seed run did.
-  console.log(`Seed complete — ${ticketPlan.length} tickets:`);
+  const actualCount = await prisma.ticket.count();
+  if (actualCount !== ticketPlan.length) {
+    console.error(
+      `Seed count mismatch: expected ${ticketPlan.length} tickets from ` +
+      `this seed's plan, but the database has ${actualCount}. This does ` +
+      `not necessarily mean something is wrong — if tickets exist from ` +
+      `other sources (e.g. the Playwright E2E suite run against this ` +
+      `same dev database), a difference here is expected, not a seed bug. ` +
+      `Investigate if this number is unexpectedly low.`
+    );
+  }
+  console.log(`Seed complete — ${ticketPlan.length} tickets (this run's plan; DB total: ${actualCount}):`);
   for (const [name, count] of Object.entries(ticketCounts)) {
     console.log(`  ${name}: ${count}`);
   }
