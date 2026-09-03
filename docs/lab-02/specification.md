@@ -524,3 +524,12 @@ Meaningful choices not already fixed by the labsheet, each with its reason:
     (`/tickets/:id`) are what a router is for; hand-rolling this via component
     state (as Lab 1's placeholder `App.tsx` does) would only reproduce a router
     poorly.
+13. Committed E2E/visual screenshots and the E2E spec files live under
+    `e2e/lab-02/screenshots/` and `e2e/lab-02/`, not the labsheet §12
+    illustration's `artifacts/lab-02/screenshots/` and `e2e/lab-02/`. `e2e/`
+    already exists as its own sibling workspace (its own `package.json` and
+    `playwright.config.ts`, separate from `client/`/`server/`), and keeping
+    the screenshots as a subdirectory of the suite that produces them avoids
+    a second top-level directory whose only contents are output from the
+    first. `tests.md` §1 and §4 document this path and use it consistently
+    throughout; nothing reads or writes `artifacts/`.
