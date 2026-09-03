@@ -79,9 +79,13 @@ npx prisma migrate deploy
 npm run prisma:seed
 ```
 
-This creates the `Category` table and inserts the four supported IT request
-categories. The seed uses `upsert`, so running it more than once will not create
-duplicates.
+This applies both migrations (Lab 1's `Category` table, then Lab 2's
+`RequesterUser`, `RelatedSystem`, `Ticket`, and `Attachment` tables) and
+seeds: 4 Categories, 6 Related Systems, 5 Development Requesters (4 active,
+1 inactive), and ~30 Tickets split 25/5/0 across three of the active
+Requesters. The seed uses `upsert` for reference data and is otherwise
+idempotent for Tickets — running it more than once produces the same
+counts, not duplicates.
 
 ## Running the application
 
@@ -103,33 +107,79 @@ npm run dev
 
 ## Testing
 
+Four independent test suites cover Lab 2:
+
 ```
 cd server
 npm test
+```
+Unit and API/integration tests (Vitest + Supertest), run against a
+separate `toktickit_test` Postgres database — never the dev database
+above. Create it once and point `server/.env.test` at it before the
+first run:
 
-cd ../client
+```
+psql -U postgres -c "CREATE DATABASE toktickit_test OWNER toktickit;"
+```
+```
+# server/.env.test
+DATABASE_URL="postgresql://postgres:toktickit@localhost:5432/toktickit_test?schema=public"
+```
+Adjust the role/password to whatever local Postgres user you actually
+use — `postgres` above matches this repo's own `server/.env.test`, not
+necessarily the `toktickit` role created in step 2 above.
+
+```
+cd client
 npm test
 ```
+UI component and style tests (Vitest + React Testing Library), API calls
+mocked — no database, no real network.
 
-The backend uses Vitest with Supertest for API tests. The frontend uses Vitest for UI tests.
+```
+cd server && npm run prisma:seed && npm run prisma:seed
+cd ../e2e
+npm install
+npx playwright test
+```
+E2E and responsive/visual tests (Playwright, real browser). This suite
+needs both dev servers running against the seeded **dev** database (not
+`toktickit_test`) — `playwright.config.ts` starts both automatically
+and reuses them if already running. A `globalSetup` resets and reseeds
+the dev database to the exact 25/5/0 shape before every run, so the
+running `npm run prisma:seed` above is optional but harmless; the two
+commands together confirm the seed itself is idempotent before
+Playwright takes over.
+
+Screenshots from the responsive/visual suite are committed under
+`e2e/lab-02/screenshots/`, organized by screen, matching the fixed
+paths in `docs/lab-02/tests.md` §4.
 
 ## Project structure
 
 ```
 client/           React + Vite frontend
   src/            Application source
-  tests/lab-01/   UI tests
+  tests/lab-01/   UI tests (Lab 1)
+  tests/lab-02/   UI tests (Lab 2)
 server/           Express + Prisma backend
   src/            Application source
   prisma/         Schema, migrations, and seed
-  tests/lab-01/   API tests
-docs/lab-01/      Lab documentation
+  tests/lab-01/   API tests (Lab 1)
+  tests/lab-02/   API tests (Lab 2)
+e2e/              Playwright E2E and responsive/visual tests
+  lab-02/         Specs and committed screenshots
+docs/lab-01/      Lab 1 documentation
+docs/lab-02/      Lab 2 documentation (specification, API spec, UI spec,
+                  test plan, AI usage log)
 ```
 
 ## Branching model
 
 ```
-main  <-  lab1-staging  <-  feature/*
+main  <-  lab2-staging  <-  feature/*
 ```
 
-Feature branches are opened as pull requests into `lab1-staging`. A single release pull request merges `lab1-staging` into `main` at the end of the lab.
+Feature branches are opened as pull requests into `lab2-staging`. A single
+release pull request merges `lab2-staging` into `main` at the end of each
+lab.
