@@ -3,12 +3,23 @@ node_modules/
 # env & secrets
 .env
 *.env
+.env.test
 !.env.example
+
+# uploaded attachment files (Issue 18)
+server/uploads/
 # build output
 dist/
 build/
+# compiled output emitted next to source by tsc
+client/src/**/*.js
+client/tests/**/*.js
 # prisma
 server/prisma/*.db
+# Playwright run artifacts (e2e/lab-02/screenshots/ is committed evidence, not this)
+e2e/test-results/
+e2e/playwright-report/
 # logs & OS
 *.log
 .DS_Store
+docs/lab-02/*.pdf

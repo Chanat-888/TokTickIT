@@ -1,0 +1,758 @@
+/* Focus rule — ui-spec.md §3, AC-25 */
+:focus-visible {
+  outline: 2px solid var(--color-secondary-green);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Buttons — ui-spec.md §5, §19                                           */
+/* ---------------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  height: var(--control-height);
+  padding: 0 var(--space-lg);
+  border-radius: var(--radius-control);
+  border: 1px solid transparent;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  background: transparent;
+  color: inherit;
+  text-decoration: none;
+}
+
+.btn--primary {
+  background: var(--color-primary-green);
+  border-color: var(--color-primary-green);
+  color: #ffffff;
+}
+
+.btn--secondary {
+  background: var(--color-surface);
+  border-color: var(--color-secondary-green);
+  color: var(--color-secondary-green);
+}
+
+.btn--tertiary {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-secondary-green);
+  padding-left: var(--space-sm);
+  padding-right: var(--space-sm);
+}
+
+.btn--tertiary:hover,
+.btn--tertiary:focus-visible {
+  background: var(--color-pale-green);
+  text-decoration: underline;
+}
+
+.btn--destructive {
+  background: var(--color-surface);
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+/* Disabled — any tier, never the busy state (§5) */
+.btn:disabled:not(.btn--busy),
+.btn[aria-disabled="true"]:not(.btn--busy) {
+  opacity: 0.6;
+  background: var(--color-disabled-bg);
+  border-color: var(--color-disabled-bg);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+/* Busy — same tier look as Primary, plus a spinner (§5) */
+.btn--busy {
+  background: var(--color-primary-green);
+  border-color: var(--color-primary-green);
+  color: #ffffff;
+  cursor: progress;
+}
+
+.btn__spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #ffffff;
+  animation: btn-spinner-spin 0.6s linear infinite;
+}
+
+@keyframes btn-spinner-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Badges — ui-spec.md §14, §19                                           */
+/* ---------------------------------------------------------------------- */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-badge);
+  border: 1px solid transparent;
+  font-size: var(--font-size-small);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.badge--priority-low {
+  background: var(--color-pale-green);
+  border-color: var(--color-secondary-green);
+  color: var(--color-secondary-green);
+}
+
+.badge--priority-medium {
+  background: var(--color-surface);
+  border-color: var(--color-secondary-green);
+  color: var(--color-secondary-green);
+}
+
+.badge--priority-high {
+  background: var(--color-surface);
+  border-width: 2px;
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+.badge--status-new {
+  background: var(--color-pale-green);
+  border-color: var(--color-secondary-green);
+  color: var(--color-secondary-green);
+}
+
+/* ---------------------------------------------------------------------- */
+/* State banner — ui-spec.md §7, §19                                      */
+/* ---------------------------------------------------------------------- */
+
+.state-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-field-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-body);
+}
+
+.state-banner--loading {
+  color: var(--color-text-muted);
+}
+
+.state-banner--empty,
+.state-banner--no-results {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: var(--space-2xl) var(--space-lg);
+}
+
+.state-banner--error {
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+.state-banner--success {
+  border-color: var(--color-secondary-green);
+  background: var(--color-pale-green);
+  color: var(--color-secondary-green);
+}
+
+.state-banner--warning {
+  border-color: var(--color-warning-border);
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Application shell — ui-spec.md §10, §19                                */
+/* ---------------------------------------------------------------------- */
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-page-bg);
+}
+
+.app-shell__header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  min-height: 64px;
+  padding: 0 var(--space-xl);
+  background: var(--color-primary-green);
+  color: #ffffff;
+}
+
+.app-shell__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.app-shell__nav-link {
+  display: inline-flex;
+  align-items: center;
+  height: 64px;
+  padding: 0 var(--space-xs);
+  color: #ffffff;
+  text-decoration: none;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-body);
+  border-bottom: 2px solid transparent;
+}
+
+.app-shell__nav-link--active {
+  border-bottom-color: #ffffff;
+  font-weight: 600;
+}
+
+.app-shell__requester {
+  color: #ffffff;
+  font-size: var(--font-size-body);
+}
+
+.app-shell__change-requester-btn {
+  flex-shrink: 0;
+}
+
+.app-shell__mobile-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: var(--space-xs);
+}
+
+@media (max-width: 767px) {
+  .app-shell__header {
+    flex-wrap: wrap;
+  }
+
+  .app-shell__nav,
+  .app-shell__requester,
+  .app-shell__change-requester-btn {
+    display: none;
+  }
+
+  .app-shell__mobile-toggle {
+    display: inline-flex;
+  }
+
+  .app-shell--nav-open .app-shell__nav,
+  .app-shell--nav-open .app-shell__requester,
+  .app-shell--nav-open .app-shell__change-requester-btn {
+    display: flex;
+    width: 100%;
+  }
+
+  .app-shell--nav-open .app-shell__nav {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .app-shell--nav-open .app-shell__nav-link {
+    height: var(--control-height);
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Requester Selection — ui-spec.md §11, §19                              */
+/* ---------------------------------------------------------------------- */
+
+.requester-select {
+  max-width: 420px;
+  margin: var(--space-3xl) auto;
+  padding: var(--space-xl);
+  background: var(--color-surface);
+  border-radius: var(--radius-control);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.requester-select__dropdown {
+  height: var(--control-height);
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-field-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-body);
+}
+
+.requester-select__continue-btn {
+  align-self: flex-start;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Form field — ui-spec.md §3, §4, §19                                    */
+/* ---------------------------------------------------------------------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.field__label {
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-label);
+  color: var(--color-text);
+}
+
+.field__required-marker {
+  color: var(--color-error);
+  margin-left: var(--space-xs);
+}
+
+.field__control {
+  height: var(--control-height);
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-field-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-body);
+}
+
+textarea.field__control {
+  height: auto;
+  min-height: 96px;
+  padding-top: var(--space-sm);
+  padding-bottom: var(--space-sm);
+  resize: vertical;
+}
+
+.field__control--readonly {
+  background: var(--color-readonly-bg);
+  border-color: var(--color-readonly-border);
+}
+
+.field__control--invalid {
+  border-color: var(--color-error);
+  border-width: 2px;
+}
+
+.field__control--disabled,
+.field__control:disabled {
+  background: var(--color-disabled-bg);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.field__message {
+  font-size: var(--font-size-small);
+  margin: 0;
+}
+
+.field__message--error {
+  color: var(--color-error);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Attachment picker — ui-spec.md §6, §19                                 */
+/* ---------------------------------------------------------------------- */
+
+.attachment-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.attachment-picker__dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl);
+  border: 2px dashed var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  text-align: center;
+}
+
+.attachment-picker__error {
+  color: var(--color-error);
+  font-size: var(--font-size-small);
+  margin: 0;
+}
+
+.attachment-picker__chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  font-size: var(--font-size-small);
+  list-style: none;
+}
+
+.attachment-picker__chip--invalid {
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+.attachment-picker__chip-remove {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: var(--font-size-body);
+  line-height: 1;
+  margin-left: auto;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Create Ticket — ui-spec.md §12, §8                                     */
+/* ---------------------------------------------------------------------- */
+
+.create-ticket {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.create-ticket__readonly-row,
+.create-ticket__classification-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-lg);
+}
+
+.create-ticket__actions {
+  display: flex;
+  gap: var(--space-md);
+}
+
+@media (max-width: 991px) {
+  .create-ticket__readonly-row,
+  .create-ticket__classification-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .create-ticket__readonly-row,
+  .create-ticket__classification-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* My Tickets — ui-spec.md §13, §19                                       */
+/* ---------------------------------------------------------------------- */
+
+.my-tickets {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.ticket-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.ticket-toolbar__search {
+  height: var(--control-height);
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-field-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-body);
+  flex: 1 1 240px;
+  min-width: 180px;
+}
+
+.ticket-toolbar__filter,
+.ticket-toolbar__page-size,
+.ticket-toolbar__sort-select {
+  height: var(--control-height);
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-field-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-body);
+}
+
+.ticket-toolbar__sort-select {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------- */
+/* My Tickets — desktop table (>= 768px)                                  */
+/* ---------------------------------------------------------------------- */
+
+.ticket-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.ticket-table th,
+.ticket-table td {
+  padding: var(--space-sm) var(--space-md);
+  text-align: left;
+  border-bottom: 1px solid var(--color-field-border);
+  font-size: var(--font-size-body);
+}
+
+.ticket-table__header--sortable {
+  padding: 0;
+}
+
+.ticket-table__header--sortable .btn {
+  height: auto;
+  padding: var(--space-sm) var(--space-md);
+}
+
+.ticket-table__sort-icon {
+  margin-left: var(--space-xs);
+}
+
+.ticket-table__row {
+  cursor: pointer;
+}
+
+.ticket-table__row:hover {
+  background: var(--color-pale-green);
+}
+
+.ticket-table__row--skeleton td {
+  background: var(--color-disabled-bg);
+  height: var(--control-height);
+}
+
+.ticket-card-list {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------- */
+/* My Tickets — mobile cards (< 768px)                                    */
+/* ---------------------------------------------------------------------- */
+
+.ticket-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-lg);
+  border: 1px solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.ticket-card--skeleton {
+  min-height: 96px;
+  background: var(--color-disabled-bg);
+  cursor: default;
+}
+
+.ticket-card__header-row,
+.ticket-card__secondary-row,
+.ticket-card__footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.ticket-card__ticket-number {
+  font-weight: 600;
+}
+
+.ticket-card__title {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: break-word;
+}
+
+.ticket-card__footer-row {
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+
+.ticket-card__footer-label {
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------- */
+/* My Tickets — pagination (§13.5, §19)                                   */
+/* ---------------------------------------------------------------------- */
+
+.ticket-list__pagination-summary {
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.pagination__page-btn--active {
+  background: var(--color-primary-green);
+  color: #ffffff;
+  border-radius: var(--radius-control);
+}
+
+/* ---------------------------------------------------------------------- */
+/* My Tickets — responsive breakpoint (ui-spec.md §8, §13.3, §13.4)       */
+/* ---------------------------------------------------------------------- */
+
+@media (max-width: 767px) {
+  .ticket-table {
+    display: none;
+  }
+
+  .ticket-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .ticket-toolbar__sort-select {
+    display: inline-flex;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Ticket Detail — ui-spec.md §16, §17, §19                               */
+/* ---------------------------------------------------------------------- */
+
+.ticket-detail {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.ticket-detail__back-link {
+  align-self: flex-start;
+}
+
+.ticket-detail__header {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-lg);
+  padding: var(--space-xl);
+  background: var(--color-surface);
+  border-radius: var(--radius-control);
+}
+
+.ticket-detail__attachments {
+  padding: var(--space-xl);
+  background: var(--color-surface);
+  border-radius: var(--radius-control);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.attachment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.attachment-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.attachment-item--active {
+  opacity: 1;
+}
+
+.attachment-item--removed {
+  opacity: 0.6;
+}
+
+.attachment-item__name {
+  font-weight: 600;
+}
+
+.attachment-item__meta {
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+
+.attachment-item__preview-btn,
+.attachment-item__download-btn,
+.attachment-item__remove-btn {
+  white-space: nowrap;
+}
+
+.attachment-item__preview-btn[aria-disabled="true"],
+.attachment-item__download-btn[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.attachment-remove-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-page-bg);
+}

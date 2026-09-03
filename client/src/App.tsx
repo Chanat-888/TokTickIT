@@ -1,62 +1,73 @@
-import { useState } from "react";
-import { checkSystem, Category } from "./api.js";
+import type { ReactNode } from "react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import AppShell from "./components/AppShell.js";
+import RequesterSelect from "./screens/RequesterSelect.js";
+import CreateTicketForm from "./screens/CreateTicketForm.js";
+import MyTickets from "./screens/MyTickets.js";
+import TicketDetail from "./screens/TicketDetail.js";
+import { RequesterProvider, useRequester } from "./lib/requesterContext.js";
 
-// UI states handled below: idle, loading, success, error.
-type UiState = "idle" | "loading" | "success" | "error";
+// AC-02: /tickets, /tickets/new, /tickets/:id redirect here when nothing is
+// selected.
+function RequireRequester({ children }: { children: ReactNode }) {
+  const { requester } = useRequester();
+  if (!requester) {
+    return <Navigate to="/select-requester" replace />;
+  }
+  return <>{children}</>;
+}
+
+function NotFoundPlaceholder() {
+  return <h1>Not Found</h1>;
+}
 
 export default function App() {
-  const [state, setState] = useState<UiState>("idle");
-  const [categories, setCategories] = useState<Category[]>([]);
-
-  async function handleCheck() {
-    setState("loading");
-    try {
-      const result = await checkSystem();
-      setCategories(result.categories);
-      setState("success");
-    } catch {
-      setCategories([]);
-      setState("error");
-    }
-  }
-
   return (
-    <div className="container py-5" style={{ maxWidth: 640 }}>
-      <h1 className="h3 mb-4">
-        TokTickIT <span className="text-success">IT Service Desk</span>
-      </h1>
-
-      <button className="btn btn-success" onClick={handleCheck} disabled={state === "loading"}>
-        {state === "loading" ? "Loading…" : "Check System"}
-      </button>
-
-      {state === "loading" && (
-        <p className="text-muted mt-3 mb-0">Checking system…</p>
-      )}
-
-      {state === "success" && (
-        <>
-          <div className="alert alert-success mt-3 mb-0" role="status">
-            System Status: Online
-          </div>
-
-          <h2 className="h5 mt-4">Request Categories</h2>
-          <ul className="list-group">
-            {categories.map((category) => (
-              <li key={category.id} className="list-group-item">
-                {category.name}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-
-      {state === "error" && (
-        <div className="alert alert-danger mt-3 mb-0" role="alert">
-          <strong>System Status: Offline</strong>
-          <div>Unable to connect to TokTickIT API</div>
-        </div>
-      )}
-    </div>
+    <RequesterProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Navigate to="/tickets" replace />} />
+          <Route path="/select-requester" element={<RequesterSelect />} />
+          <Route
+            path="/tickets"
+            element={
+              <RequireRequester>
+                <AppShell>
+                  <MyTickets />
+                </AppShell>
+              </RequireRequester>
+            }
+          />
+          <Route
+            path="/tickets/new"
+            element={
+              <RequireRequester>
+                <AppShell>
+                  <CreateTicketForm />
+                </AppShell>
+              </RequireRequester>
+            }
+          />
+          <Route
+            path="/tickets/:id"
+            element={
+              <RequireRequester>
+                <AppShell>
+                  <TicketDetail />
+                </AppShell>
+              </RequireRequester>
+            }
+          />
+          <Route
+            path="*"
+            element={
+              <AppShell>
+                <NotFoundPlaceholder />
+              </AppShell>
+            }
+          />
+        </Routes>
+      </BrowserRouter>
+    </RequesterProvider>
   );
 }
