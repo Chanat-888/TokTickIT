@@ -220,6 +220,8 @@ enforced by the backend; a button that is merely hidden is not security.
   force unchanged except where explicitly superseded above (BR-03, BR-15)
   — attachment type/size/count limits and idempotent ticket creation are
   unaffected by Lab 3.
+- BR-35 A successful password change invalidates the user's other active
+  sessions; only the session that made the request stays valid.
 
 ### Status transition matrix
 

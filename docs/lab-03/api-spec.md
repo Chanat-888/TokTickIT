@@ -137,7 +137,9 @@ Body: `{ email: string, password: string }`.
 **POST /auth/change-password**
 Body: `{ currentPassword: string, newPassword: string }`. Allowed even
 while `mustChangePassword` is true (§0.1).
-- `200` — User representation with `mustChangePassword: false`.
+- `200` — User representation with `mustChangePassword: false`. All other
+  active sessions for the user are invalidated; only the session that made
+  the request stays valid (BR-35).
 - `400` — `newPassword` fails BR-07, or `newPassword === currentPassword`.
 - `401` — `currentPassword` does not match.
 
@@ -197,6 +199,12 @@ Body: `{ ownerId: integer | null }` (`null` unassigns).
 - `400` — `ownerId` does not reference an active `IT_STAFF`/
   `ADMINISTRATOR` user (BR-16).
 - `404` — Ticket not found.
+
+**GET /api/staff/assignable-users** — IT Staff, Administrator.
+Query: `search` (optional, matches name by case-insensitive substring).
+Returns active `IT_STAFF` and `ADMINISTRATOR` users for the Owner picker
+(BR-16).
+- `200` — `{ data: [{ id, name, role }] }`.
 
 **PATCH /api/staff/tickets/:id/it-priority** — IT Staff, Administrator.
 Body: `{ itPriority: "LOW" | "MEDIUM" | "HIGH" }`.
