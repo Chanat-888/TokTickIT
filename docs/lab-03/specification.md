@@ -393,6 +393,7 @@ with 403 (BR-02).
 | GET | `/api/staff/tickets` | Ticket Queue (search/filter/sort/page) | IT Staff, Administrator |
 | GET | `/api/staff/tickets/:id` | Ticket Detail for staff | IT Staff, Administrator |
 | POST | `/api/staff/tickets/:id/owner` | Claim/assign/reassign Owner | IT Staff, Administrator |
+| GET | `/api/staff/assignable-users` | Active IT Staff/Administrator users for the Owner picker | IT Staff, Administrator |
 | PATCH | `/api/staff/tickets/:id/it-priority` | Set IT Priority | IT Staff, Administrator |
 | PATCH | `/api/staff/tickets/:id/status` | Status transition | IT Staff, Administrator |
 | POST | `/api/tickets/:id/notes` | Create an Internal Note | IT Staff, Administrator |
