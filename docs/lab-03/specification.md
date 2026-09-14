@@ -222,6 +222,9 @@ enforced by the backend; a button that is merely hidden is not security.
   unaffected by Lab 3.
 - BR-35 A successful password change invalidates the user's other active
   sessions; only the session that made the request stays valid.
+- BR-36 `isActive` is checked on every authenticated request, not only at
+  login. A session belonging to a user who becomes inactive is rejected on
+  its next request.
 
 ### Status transition matrix
 
