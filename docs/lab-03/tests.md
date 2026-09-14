@@ -98,6 +98,7 @@ its edge value, not only comfortably-inside/outside values.
 | API-11 | API/Integration | BR-07 | `POST /auth/change-password` `newPassword` at 7 chars / missing a digit | 400 for each | `server/tests/lab-03/auth.api.test.ts` | |
 | API-12 | API/Integration | AC-02, BR-02 | A session with `mustChangePassword: true` calls `GET /api/tickets` | 403, `"Password change required"`; the same session's `GET /auth/me` still succeeds | `server/tests/lab-03/auth.api.test.ts` | |
 | API-13 | API/Integration | BR-12 | A session past its 12-hour `expiresAt` (clock mocked) calls `GET /auth/me` | 401, same as no session | `server/tests/lab-03/auth.api.test.ts` | |
+| API-65 | API/Integration | BR-35 | A user logged in on two sessions (two cookies) calls `POST /auth/change-password` on session A, then session B calls `GET /auth/me` | Session A's response succeeds; session B's later call returns 401 (its `Session` row was invalidated) | `server/tests/lab-03/auth.api.test.ts` | |
 
 **authorization.api.test.ts**
 
@@ -137,6 +138,7 @@ its edge value, not only comfortably-inside/outside values.
 | API-35 | API/Integration | AC-17, BR-19 | `PATCH .../status` `New` → `Closed` | 409, `"Status transition not permitted"` | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | |
 | API-36 | API/Integration | AC-19, BR-19 | `PATCH .../status` called with a Requester session | 403 | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | |
 | API-37 | API/Integration | api-spec.md §3 | `owner`/`it-priority`/`status` endpoints against a nonexistent Ticket id | 404 for each | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | |
+| API-66 | API/Integration | BR-16, api-spec.md §3 | `GET /api/staff/assignable-users` (optionally `?search=`) | 200, only active `IT_STAFF`/`ADMINISTRATOR` users; inactive and `REQUESTER` users excluded; search filters by name substring | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | |
 
 **comments-notes.api.test.ts**
 
@@ -201,6 +203,7 @@ its edge value, not only comfortably-inside/outside values.
 | UI-15 | UI Component | ui-spec.md §5.6 | Selecting `Cancelled` or `Closed` | Confirmation dialog opens; the PATCH request is sent only after Confirm | `client/tests/lab-03/StaffTicketDetail.test.tsx` | |
 | UI-16 | UI Component | ui-spec.md §3 | Switching between the Public Comments tab and Internal Notes tab | Correct panel content and compose box render for the active tab | `client/tests/lab-03/StaffTicketDetail.test.tsx` | |
 | UI-17 | UI Component | ui-spec.md §5.6 | IT Priority vs. Requested Priority controls | IT Priority renders editable-field styling; Requested Priority beside it stays read-only-styled | `client/tests/lab-03/StaffTicketDetail.test.tsx` | |
+| UI-24 | UI Component | api-spec.md §3 (`GET /api/staff/assignable-users`) | Owner select, opened on an assigned Ticket | Populated from the assignable-users response (mocked), not the full Administrator user list | `client/tests/lab-03/StaffTicketDetail.test.tsx` | |
 | UI-18 | UI Component | FR-16 | User list render | Name/Email/Role badge/Status pill/Edit action per row | `client/tests/lab-03/UserManagement.test.tsx` | |
 | UI-19 | UI Component | AC-21 | Search box input | Triggers a filtered query; results update | `client/tests/lab-03/UserManagement.test.tsx` | |
 | UI-20 | UI Component | AC-22 | Create form, server returns 409 | Inline message renders beside the Email field; form values preserved | `client/tests/lab-03/UserManagement.test.tsx` | |
@@ -395,3 +398,11 @@ column above is filled in.
   every Requester-reachable response shape rather than adding a
   test per endpoint, since BR-04/BR-23 apply identically to every one of
   them and a per-endpoint repeat would not catch a different class of bug.
+- API-65, API-66, and UI-24 were added after PR #46 (specification.md/
+  api-spec.md) merged with two review-response commits not reflected in
+  this document's first draft: BR-35 (password change invalidates the
+  user's other sessions) and the `GET /api/staff/assignable-users`
+  endpoint. IDs are appended out of strict numeric order within their
+  table rather than renumbering the whole document, since renumbering
+  would risk silently breaking the §3 traceability table's existing
+  references.
