@@ -7,6 +7,7 @@ import CreateTicketForm from "./screens/CreateTicketForm.js";
 import MyTickets from "./screens/MyTickets.js";
 import TicketDetail from "./screens/TicketDetail.js";
 import StaffTicketQueue from "./screens/StaffTicketQueue.js";
+import StaffTicketDetail from "./screens/StaffTicketDetail.js";
 import { AuthProvider, useAuth } from "./lib/authContext.js";
 import StateBanner from "./components/StateBanner.js";
 
@@ -128,6 +129,16 @@ function AppRoutes() {
           <RequireAuth>
             <AppShell>
               <StaffTicketQueue />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/staff/tickets/:id"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <StaffTicketDetail />
             </AppShell>
           </RequireAuth>
         }

@@ -231,4 +231,45 @@ describe("Public Comments and Problem Appears Resolved", () => {
     expect(res.status).toBe(201);
     expect(res.body.authorId).toBe(requester.id);
   });
+
+  // API-41
+  it("POST /api/tickets/:id/notes by IT Staff returns 201 with the Note representation", async () => {
+    const { ticket } = await seedOwnedTicket();
+    const staff = await seedUser("Jordan Blake", `jordan-${randomUUID()}@example.com`, "IT_STAFF");
+
+    const res = await request(app)
+      .post(`/api/tickets/${ticket.id}/notes`)
+      .set("Cookie", await sessionCookieFor(staff.id))
+      .send({ body: "Escalated to hardware vendor." });
+
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({
+      ticketId: ticket.id,
+      authorId: staff.id,
+      authorName: "Jordan Blake",
+      authorRole: "IT_STAFF",
+      body: "Escalated to hardware vendor.",
+    });
+  });
+
+  // API-42
+  it("No Requester-reachable response for a Ticket with Internal Notes includes note content anywhere in the body", async () => {
+    const { requester, ticket } = await seedOwnedTicket();
+    const staff = await seedUser("Jordan Blake", `jordan-${randomUUID()}@example.com`, "IT_STAFF");
+    await getPrisma().internalNote.create({
+      data: { ticketId: ticket.id, authorId: staff.id, body: "SECRET-INTERNAL-NOTE-CONTENT" },
+    });
+
+    const cookie = await sessionCookieFor(requester.id);
+    const ticketRes = await request(app).get(`/api/tickets/${ticket.id}`).set("Cookie", cookie);
+    const commentsRes = await request(app).get(`/api/tickets/${ticket.id}/comments`).set("Cookie", cookie);
+    const notesRes = await request(app).get(`/api/tickets/${ticket.id}/notes`).set("Cookie", cookie);
+
+    expect(JSON.stringify(ticketRes.body)).not.toContain("SECRET-INTERNAL-NOTE-CONTENT");
+    expect(JSON.stringify(commentsRes.body)).not.toContain("SECRET-INTERNAL-NOTE-CONTENT");
+    // BR-23/AC-04: the notes endpoint itself rejects a Requester with 403
+    // and no note content in the body.
+    expect(notesRes.status).toBe(403);
+    expect(JSON.stringify(notesRes.body)).not.toContain("SECRET-INTERNAL-NOTE-CONTENT");
+  });
 });

@@ -5,7 +5,7 @@ import multer from "multer";
 import path from "node:path";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
-import { Prisma, type Ticket, type Attachment, type PublicComment, type User } from "@prisma/client";
+import { Prisma, type Ticket, type Attachment, type PublicComment, type InternalNote, type User } from "@prisma/client";
 import { getPrisma } from "./prisma.js";
 import { generateTicketNumber } from "./ticketNumber.js";
 import { validateTicketInput } from "./ticketValidation.js";
@@ -247,6 +247,19 @@ function commentToJSON(c: PublicComment & { author: User }) {
     authorRole: c.author.role,
     body: c.body,
     createdAt: c.createdAt.toISOString(),
+  };
+}
+
+// api-spec.md §3 — same shape as commentToJSON, scoped to InternalNote.
+function noteToJSON(n: InternalNote & { author: User }) {
+  return {
+    id: n.id,
+    ticketId: n.ticketId,
+    authorId: n.authorId,
+    authorName: n.author.name,
+    authorRole: n.author.role,
+    body: n.body,
+    createdAt: n.createdAt.toISOString(),
   };
 }
 
@@ -1155,6 +1168,207 @@ app.get("/api/staff/assignable-users", requireStaff, async (req: Request, res: R
     return res.status(200).json({ data: users });
   } catch (err) {
     console.error("GET /api/staff/assignable-users failed:", err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Issue 41 — IT Staff Ticket Detail: claim/assign, IT Priority, status,
+// Internal Notes (docs/lab-03/api-spec.md §3, specification.md §5).
+// ---------------------------------------------------------------------------
+
+async function findTicketById(idParam: string): Promise<Ticket | null> {
+  if (!/^\d+$/.test(idParam)) return null;
+  return getPrisma().ticket.findUnique({ where: { id: Number(idParam) } });
+}
+
+// specification.md §5 "Status transition matrix" — BR-19. Any pair not
+// listed here is rejected with 409.
+const STATUS_TRANSITIONS: Record<string, string[]> = {
+  NEW: ["OPEN", "CANCELLED"],
+  OPEN: ["IN_PROGRESS", "WAITING_FOR_REQUESTER", "CANCELLED"],
+  IN_PROGRESS: ["WAITING_FOR_REQUESTER", "RESOLVED", "CANCELLED"],
+  WAITING_FOR_REQUESTER: ["IN_PROGRESS", "RESOLVED", "CANCELLED"],
+  RESOLVED: ["CLOSED", "REOPENED"],
+  CLOSED: ["REOPENED"],
+  REOPENED: ["IN_PROGRESS", "CANCELLED"],
+  CANCELLED: [],
+};
+
+app.get("/api/staff/tickets/:id", requireStaff, async (req: Request, res: Response) => {
+  try {
+    const ticket = await findTicketById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const [attachments, comments, notes] = await Promise.all([
+      getPrisma().attachment.findMany({ where: { ticketId: ticket.id }, orderBy: { id: "asc" } }),
+      getPrisma().publicComment.findMany({
+        where: { ticketId: ticket.id },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        include: { author: true },
+      }),
+      getPrisma().internalNote.findMany({
+        where: { ticketId: ticket.id },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        include: { author: true },
+      }),
+    ]);
+
+    return res.status(200).json({
+      ...staffTicketToJSON(ticket),
+      attachments: attachments.map(attachmentToJSON),
+      comments: comments.map(commentToJSON),
+      notes: notes.map(noteToJSON),
+    });
+  } catch (err) {
+    console.error(`GET /api/staff/tickets/${req.params.id} failed:`, err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
+// BR-16/BR-18: null unassigns; a non-null value must reference an active
+// IT_STAFF/ADMINISTRATOR user. Checked in order: request-body shape (400,
+// no DB lookup needed) -> Ticket existence (404) -> the referenced user's
+// role/active state (400, needs its own DB lookup) — cheap/synchronous
+// checks first, then existence, then the more expensive referential check.
+app.post("/api/staff/tickets/:id/owner", requireStaff, async (req: Request, res: Response) => {
+  try {
+    const body = (req.body ?? {}) as { ownerId?: unknown };
+    if (body.ownerId !== null && typeof body.ownerId !== "number") {
+      return res.status(400).json({
+        errors: [{ field: "ownerId", message: "ownerId must be an integer or null" }],
+      });
+    }
+
+    const ticket = await findTicketById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    let ownerId: number | null = null;
+    if (body.ownerId !== null) {
+      const candidate = await getPrisma().user.findUnique({ where: { id: body.ownerId } });
+      if (!candidate || !candidate.isActive || (candidate.role !== "IT_STAFF" && candidate.role !== "ADMINISTRATOR")) {
+        return res.status(400).json({
+          errors: [{ field: "ownerId", message: "ownerId must reference an active IT Staff or Administrator user" }],
+        });
+      }
+      ownerId = candidate.id;
+    }
+
+    const updated = await getPrisma().ticket.update({ where: { id: ticket.id }, data: { ownerId } });
+    return res.status(200).json(staffTicketToJSON(updated));
+  } catch (err) {
+    console.error(`POST /api/staff/tickets/${req.params.id}/owner failed:`, err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
+app.patch("/api/staff/tickets/:id/it-priority", requireStaff, async (req: Request, res: Response) => {
+  try {
+    const body = (req.body ?? {}) as { itPriority?: unknown };
+    if (typeof body.itPriority !== "string" || !PRIORITIES_FOR_FILTER.has(body.itPriority)) {
+      return res.status(400).json({
+        errors: [{ field: "itPriority", message: "itPriority must be LOW, MEDIUM, or HIGH" }],
+      });
+    }
+
+    const ticket = await findTicketById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const updated = await getPrisma().ticket.update({
+      where: { id: ticket.id },
+      data: { itPriority: body.itPriority as Ticket["itPriority"] },
+    });
+    return res.status(200).json(staffTicketToJSON(updated));
+  } catch (err) {
+    console.error(`PATCH /api/staff/tickets/${req.params.id}/it-priority failed:`, err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
+// BR-19: only along the transition matrix above; checked after Ticket
+// existence since the current status (needed to evaluate the transition)
+// only exists once the Ticket is fetched.
+app.patch("/api/staff/tickets/:id/status", requireStaff, async (req: Request, res: Response) => {
+  try {
+    const body = (req.body ?? {}) as { status?: unknown };
+    if (typeof body.status !== "string" || !ALL_STATUSES.has(body.status)) {
+      return res.status(400).json({
+        errors: [{ field: "status", message: "status must be a recognized Ticket status" }],
+      });
+    }
+
+    const ticket = await findTicketById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const allowedTargets = STATUS_TRANSITIONS[ticket.status] ?? [];
+    if (!allowedTargets.includes(body.status)) {
+      return res.status(409).json({ error: "Status transition not permitted" });
+    }
+
+    const updated = await getPrisma().ticket.update({
+      where: { id: ticket.id },
+      data: { status: body.status as Ticket["status"] },
+    });
+    return res.status(200).json(staffTicketToJSON(updated));
+  } catch (err) {
+    console.error(`PATCH /api/staff/tickets/${req.params.id}/status failed:`, err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
+// api-spec.md §3 — same request/response shape and validation as the
+// Comment endpoints above (§2), scoped to InternalNote; requireStaff alone
+// gives a Requester 403 via the role check (BR-23, AC-04), so no ownership
+// helper like findAccessibleTicket is needed here.
+app.post("/api/tickets/:id/notes", requireStaff, async (req: Request, res: Response) => {
+  try {
+    const ticket = await findTicketById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const body = (req.body ?? {}) as { body?: unknown };
+    const error = commentBodyError(body.body);
+    if (error) {
+      return res.status(400).json({ errors: [{ field: "body", message: error }] });
+    }
+
+    const created = await getPrisma().internalNote.create({
+      data: { ticketId: ticket.id, authorId: req.user!.id, body: (body.body as string).trim() },
+      include: { author: true },
+    });
+
+    return res.status(201).json(noteToJSON(created));
+  } catch (err) {
+    console.error(`POST /api/tickets/${req.params.id}/notes failed:`, err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
+app.get("/api/tickets/:id/notes", requireStaff, async (req: Request, res: Response) => {
+  try {
+    const ticket = await findTicketById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const notes = await getPrisma().internalNote.findMany({
+      where: { ticketId: ticket.id },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      include: { author: true },
+    });
+
+    return res.status(200).json({ data: notes.map(noteToJSON) });
+  } catch (err) {
+    console.error(`GET /api/tickets/${req.params.id}/notes failed:`, err);
     res.status(500).json({ error: "Unexpected server error" });
   }
 });

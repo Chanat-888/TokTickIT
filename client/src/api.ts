@@ -377,6 +377,79 @@ export async function getAssignableUsers(): Promise<AssignableUser[]> {
   return body.data;
 }
 
+// Issue 41 — IT Staff Ticket Detail (api-spec.md §3): staff view plus
+// attachments/comments/notes.
+export interface StaffTicketDetail extends StaffTicket {
+  attachments: Attachment[];
+  comments: Comment[];
+  notes: Comment[];
+}
+
+export async function getStaffTicket(id: number): Promise<StaffTicketDetail> {
+  const res = await apiFetch(`/api/staff/tickets/${id}`);
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  if (!res.ok) {
+    throw new Error(`Staff ticket fetch failed with status ${res.status}`);
+  }
+  return (await res.json()) as StaffTicketDetail;
+}
+
+// BR-18: null unassigns; any other value claims/(re)assigns.
+export async function setTicketOwner(ticketId: number, ownerId: number | null): Promise<StaffTicket> {
+  const res = await apiFetch(`/api/staff/tickets/${ticketId}/owner`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ownerId }),
+  });
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  if (!res.ok) {
+    throw new Error(`Set owner failed with status ${res.status}`);
+  }
+  return (await res.json()) as StaffTicket;
+}
+
+export async function setTicketItPriority(ticketId: number, itPriority: Priority): Promise<StaffTicket> {
+  const res = await apiFetch(`/api/staff/tickets/${ticketId}/it-priority`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ itPriority }),
+  });
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  if (!res.ok) {
+    throw new Error(`Set IT priority failed with status ${res.status}`);
+  }
+  return (await res.json()) as StaffTicket;
+}
+
+// BR-19: thrown on 409 so the UI can surface the specific message — the
+// Status select only ever offers legal targets, so this is a defensive
+// fallback (e.g. a stale screen) rather than the normal path.
+export class StatusTransitionError extends Error {}
+
+export async function setTicketStatus(ticketId: number, status: TicketStatus): Promise<StaffTicket> {
+  const res = await apiFetch(`/api/staff/tickets/${ticketId}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  if (res.status === 409) {
+    throw new StatusTransitionError("Status transition not permitted");
+  }
+  if (!res.ok) {
+    throw new Error(`Set status failed with status ${res.status}`);
+  }
+  return (await res.json()) as StaffTicket;
+}
+
 // Issue 21 — soft-remove an Attachment (api-spec.md §10, BR-31/BR-34).
 export async function removeAttachment(
   ticketId: number,
@@ -448,4 +521,33 @@ export async function resolveIndication(ticketId: number): Promise<Ticket> {
     throw new Error(`Resolve indication failed with status ${res.status}`);
   }
   return (await res.json()) as Ticket;
+}
+
+// Issue 41 — Internal Notes (api-spec.md §3): same shape/validation as
+// Comments, scoped to InternalNote and IT Staff/Administrator only.
+export async function getNotes(ticketId: number): Promise<Comment[]> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/notes`);
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  if (!res.ok) {
+    throw new Error(`Notes fetch failed with status ${res.status}`);
+  }
+  const body = (await res.json()) as { data: Comment[] };
+  return body.data;
+}
+
+export async function postNote(ticketId: number, body: string): Promise<Comment> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/notes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ body }),
+  });
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  if (!res.ok) {
+    throw new Error(`Post note failed with status ${res.status}`);
+  }
+  return (await res.json()) as Comment;
 }
