@@ -19,6 +19,7 @@ import {
   isValidPassword,
   toUserRepresentation,
   verifyPassword,
+  verifyPasswordForUnknownEmail,
 } from "./auth.js";
 import { requireAuth, requirePasswordChanged, requireRole } from "./middleware.js";
 // getPrisma() is your lazy database handle. Call it INSIDE a route when you
@@ -80,7 +81,13 @@ app.post("/auth/login", async (req: Request, res: Response) => {
     const user = await getPrisma().user.findUnique({
       where: { email: body.email.trim().toLowerCase() },
     });
-    if (!user || !(await verifyPassword(body.password, user.passwordHash))) {
+    if (!user) {
+      // BR-09: run the same-cost dummy compare so timing doesn't reveal that
+      // this email has no account.
+      await verifyPasswordForUnknownEmail(body.password);
+      return res.status(401).json(INVALID_CREDENTIALS_BODY);
+    }
+    if (!(await verifyPassword(body.password, user.passwordHash))) {
       return res.status(401).json(INVALID_CREDENTIALS_BODY);
     }
     // BR-10: correct credentials, inactive account — distinct 403, checked

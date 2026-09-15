@@ -26,6 +26,20 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash);
 }
 
+// BR-09: an unknown email must cost the same as a known email with the wrong
+// password, or response timing leaks which emails have accounts (a real
+// bcrypt.compare at cost 12 is ~300ms; skipping it entirely is ~1ms). Hashed
+// lazily once, from random bytes with no corresponding real password, and
+// reused for every unknown-email attempt.
+let dummyPasswordHash: Promise<string> | null = null;
+
+export async function verifyPasswordForUnknownEmail(password: string): Promise<void> {
+  if (!dummyPasswordHash) {
+    dummyPasswordHash = hashPassword(randomBytes(32).toString("hex"));
+  }
+  await verifyPassword(password, await dummyPasswordHash);
+}
+
 // BR-07: at least 8 characters, at least one letter and one digit.
 export function isValidPassword(password: string): boolean {
   return password.length >= 8 && /[A-Za-z]/.test(password) && /[0-9]/.test(password);
@@ -38,6 +52,14 @@ function hashToken(token: string): string {
 export async function createSession(userId: number): Promise<{ token: string; expiresAt: Date }> {
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
+  // Sweep this user's own already-expired sessions on every login, so the
+  // Session table doesn't grow unbounded from repeat logins. Uses the
+  // expiresAt index PR #48 added. Scoped to expired rows only — invalidating
+  // this user's other still-active sessions is BR-35's job at password
+  // change, not login.
+  await getPrisma().session.deleteMany({
+    where: { userId, expiresAt: { lte: new Date() } },
+  });
   await getPrisma().session.create({
     data: { userId, tokenHash: hashToken(token), expiresAt },
   });

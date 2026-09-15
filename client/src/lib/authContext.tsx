@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { getMe, login as apiLogin, logout as apiLogout, type LoginResult, type User } from "../api.js";
+import { setUnauthorizedHandler } from "./apiClient.js";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -37,6 +38,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     refresh().catch(() => setStatus("unauthenticated"));
   }, [refresh]);
+
+  // A 401 from any non-/auth/* request means the session died server-side
+  // mid-use; route the app back to unauthenticated instead of leaving
+  // "status" stuck on "authenticated" with requests silently failing.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setUser(null);
+      setStatus("unauthenticated");
+    });
+    return () => setUnauthorizedHandler(null);
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     const result = await apiLogin(email, password);
