@@ -60,6 +60,9 @@ const requireAnyRole = [
   requirePasswordChanged,
   requireRole("REQUESTER", "IT_STAFF", "ADMINISTRATOR"),
 ];
+// docs/lab-03/api-spec.md §3 — the IT Staff Queue and its supporting
+// endpoints.
+const requireStaff = [requireAuth, requirePasswordChanged, requireRole("IT_STAFF", "ADMINISTRATOR")];
 
 // ---------------------------------------------------------------------------
 // Issue 2 — API health check
@@ -220,6 +223,16 @@ function ticketToJSON(t: Ticket) {
       : null,
     createdAt: t.createdAt.toISOString(),
     updatedAt: t.updatedAt.toISOString(),
+  };
+}
+
+// api-spec.md §0.4 — the staff view adds itPriority and ownerId on top of
+// the Requester-facing shape above.
+function staffTicketToJSON(t: Ticket) {
+  return {
+    ...ticketToJSON(t),
+    itPriority: t.itPriority,
+    ownerId: t.ownerId,
   };
 }
 
@@ -970,5 +983,173 @@ app.post(
     }
   },
 );
+
+// ---------------------------------------------------------------------------
+// Issue 40 — IT Staff Ticket Queue (docs/lab-03/api-spec.md §3)
+// ---------------------------------------------------------------------------
+
+const STAFF_SORTABLE_FIELDS = new Set(["createdAt", "summary", "itPriority", "requestedPriority", "status"]);
+const ALL_STATUSES = new Set([
+  "NEW",
+  "OPEN",
+  "IN_PROGRESS",
+  "WAITING_FOR_REQUESTER",
+  "RESOLVED",
+  "CLOSED",
+  "REOPENED",
+  "CANCELLED",
+]);
+
+// BR-33: a pageSize past the allowed range (10/20/50) clamps to the nearest
+// boundary; one inside the range but not an allowed value is rejected —
+// unlike the Requester queue's clampPageSize, which always picks the
+// nearest allowed size and never rejects (api-spec.md §3 400 list, tests.md
+// API-27). Returns null for the reject case.
+function resolveStaffPageSize(raw: string | undefined): number | null {
+  if (raw === undefined) return 10;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return null;
+  if (n > 50) return 50;
+  if (n < 10) return 10;
+  return PAGE_SIZES.includes(n) ? n : null;
+}
+
+app.get("/api/staff/tickets", requireStaff, async (req: Request, res: Response) => {
+  try {
+    const errors: { field: string; message: string }[] = [];
+
+    let status: string | undefined;
+    if (req.query.status !== undefined) {
+      const raw = String(req.query.status);
+      if (!ALL_STATUSES.has(raw)) {
+        errors.push({ field: "status", message: "status must be a recognized Ticket status" });
+      } else {
+        status = raw;
+      }
+    }
+
+    let itPriority: "LOW" | "MEDIUM" | "HIGH" | undefined;
+    if (req.query.itPriority !== undefined) {
+      const raw = String(req.query.itPriority);
+      if (!PRIORITIES_FOR_FILTER.has(raw)) {
+        errors.push({ field: "itPriority", message: "itPriority must be LOW, MEDIUM, or HIGH" });
+      } else {
+        itPriority = raw as typeof itPriority;
+      }
+    }
+
+    let requestedPriority: "LOW" | "MEDIUM" | "HIGH" | undefined;
+    if (req.query.requestedPriority !== undefined) {
+      const raw = String(req.query.requestedPriority);
+      if (!PRIORITIES_FOR_FILTER.has(raw)) {
+        errors.push({ field: "requestedPriority", message: "requestedPriority must be LOW, MEDIUM, or HIGH" });
+      } else {
+        requestedPriority = raw as typeof requestedPriority;
+      }
+    }
+
+    let sortBy: "createdAt" | "summary" | "itPriority" | "requestedPriority" | "status" = "createdAt";
+    if (req.query.sortBy !== undefined) {
+      const raw = String(req.query.sortBy);
+      if (!STAFF_SORTABLE_FIELDS.has(raw)) {
+        errors.push({
+          field: "sortBy",
+          message: "sortBy must be one of createdAt, summary, itPriority, requestedPriority, status",
+        });
+      } else {
+        sortBy = raw as typeof sortBy;
+      }
+    }
+
+    let sortDir: "asc" | "desc" = "desc";
+    if (req.query.sortDir !== undefined) {
+      const raw = String(req.query.sortDir);
+      if (!SORT_DIRS.has(raw)) {
+        errors.push({ field: "sortDir", message: "sortDir must be asc or desc" });
+      } else {
+        sortDir = raw as typeof sortDir;
+      }
+    }
+
+    const pageSizeResult = resolveStaffPageSize(
+      req.query.pageSize !== undefined ? String(req.query.pageSize) : undefined,
+    );
+    if (pageSizeResult === null) {
+      errors.push({ field: "pageSize", message: "pageSize must be 10, 20, or 50" });
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({ errors });
+    }
+    const pageSize = pageSizeResult!;
+
+    const page = clampPage(req.query.page !== undefined ? String(req.query.page) : undefined);
+    const search = req.query.search !== undefined ? String(req.query.search) : undefined;
+
+    const where: Prisma.TicketWhereInput = {};
+    if (status !== undefined) where.status = status as Prisma.TicketWhereInput["status"];
+    if (itPriority !== undefined) where.itPriority = itPriority;
+    if (requestedPriority !== undefined) where.requestedPriority = requestedPriority;
+    if (req.query.ownerId !== undefined) {
+      // "unassigned" or an integer id (api-spec.md §3); any other value is
+      // left unfiltered rather than 400 — the UI only ever sends one of
+      // those two forms or omits the param, and ownerId isn't in the
+      // documented 400 list.
+      const raw = String(req.query.ownerId);
+      if (raw === "unassigned") {
+        where.ownerId = null;
+      } else if (/^\d+$/.test(raw)) {
+        where.ownerId = Number(raw);
+      }
+    }
+    if (search) {
+      where.OR = [
+        { ticketNumber: { startsWith: search } },
+        { summary: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    // BR-32 — id-descending tiebreaker on every sort.
+    const orderBy: Prisma.TicketOrderByWithRelationInput[] = [{ [sortBy]: sortDir }, { id: "desc" }];
+
+    const [totalCount, tickets] = await Promise.all([
+      getPrisma().ticket.count({ where }),
+      getPrisma().ticket.findMany({ where, orderBy, skip: (page - 1) * pageSize, take: pageSize }),
+    ]);
+
+    return res.status(200).json({
+      data: tickets.map(staffTicketToJSON),
+      page,
+      pageSize,
+      totalCount,
+      totalPages: Math.ceil(totalCount / pageSize),
+    });
+  } catch (err) {
+    console.error("GET /api/staff/tickets failed:", err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
+// api-spec.md §3 — active IT Staff/Administrator users for the Owner
+// picker (BR-16). The Queue needs this too, to resolve ownerId -> name for
+// display: the staff Ticket representation (§0.4) carries only ownerId.
+app.get("/api/staff/assignable-users", requireStaff, async (req: Request, res: Response) => {
+  try {
+    const search = req.query.search !== undefined ? String(req.query.search) : undefined;
+    const users = await getPrisma().user.findMany({
+      where: {
+        isActive: true,
+        role: { in: ["IT_STAFF", "ADMINISTRATOR"] },
+        ...(search ? { name: { contains: search, mode: "insensitive" as const } } : {}),
+      },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, role: true },
+    });
+    return res.status(200).json({ data: users });
+  } catch (err) {
+    console.error("GET /api/staff/assignable-users failed:", err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
 
 export default app;
