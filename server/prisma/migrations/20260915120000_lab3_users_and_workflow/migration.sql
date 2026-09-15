@@ -55,6 +55,15 @@ ALTER TABLE "User"
   ALTER COLUMN "passwordHash" SET NOT NULL,
   ALTER COLUMN "updatedAt" SET NOT NULL;
 
+-- specification.md §7: email is stored lowercased. Normalize any
+-- pre-existing mixed-case Lab 2 email first, then enforce it at the DB
+-- level with a CHECK constraint — every future INSERT/UPDATE that skips
+-- lowercasing fails outright, which is what makes the existing byte-exact
+-- User_email_key unique index sufficient for case-insensitive uniqueness
+-- (no case-variant row can ever exist to collide against).
+UPDATE "User" SET "email" = LOWER("email");
+ALTER TABLE "User" ADD CONSTRAINT "User_email_lowercase" CHECK ("email" = LOWER("email"));
+
 -- AlterTable: Ticket gains ownerId/requesterIndicatedResolvedAt (both
 -- correctly nullable for existing rows) and itPriority, which needs a
 -- backfill before it can be made NOT NULL.
@@ -107,6 +116,11 @@ CREATE UNIQUE INDEX "Session_tokenHash_key" ON "Session"("tokenHash");
 
 -- CreateIndex
 CREATE INDEX "Session_userId_idx" ON "Session"("userId");
+
+-- CreateIndex
+-- BR-12/BR-35: sessions are looked up by expiry and deleted per-user often
+-- (logout, password-change invalidation, expiry checks on every request).
+CREATE INDEX "Session_expiresAt_idx" ON "Session"("expiresAt");
 
 -- CreateIndex
 CREATE INDEX "PublicComment_ticketId_idx" ON "PublicComment"("ticketId");

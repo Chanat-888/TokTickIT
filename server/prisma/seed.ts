@@ -169,6 +169,14 @@ async function main() {
     const owner = isAssigned ? activeStaff[Math.floor(i / 4) % activeStaff.length] : null;
     const status = isAssigned ? ASSIGNED_STATUSES[Math.floor(i / 4) % ASSIGNED_STATUSES.length] : "NEW";
     const itPriority = i % 5 === 0 ? bumpPriority(requestedPriority) : requestedPriority;
+    const createdAt = new Date(base.getTime() + i * 29 * 60 * 60 * 1000);
+    // BR-24 / Queue flag: a Requester indicated the problem appears
+    // resolved on Tickets that reached RESOLVED or REOPENED, so that data
+    // exists to exercise (a few hours after creation, well before now).
+    const requesterIndicatedResolvedAt =
+      status === "RESOLVED" || status === "REOPENED"
+        ? new Date(createdAt.getTime() + 6 * 60 * 60 * 1000)
+        : null;
 
     const ticket = await prisma.ticket.upsert({
       where: { ticketNumber },
@@ -184,8 +192,9 @@ async function main() {
         itPriority,
         status,
         ownerId: owner?.id ?? null,
+        requesterIndicatedResolvedAt,
         idempotencyKey: randomUUID(),
-        createdAt: new Date(base.getTime() + i * 29 * 60 * 60 * 1000),
+        createdAt,
       },
     });
 
