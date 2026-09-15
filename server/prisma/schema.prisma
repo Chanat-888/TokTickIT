@@ -12,11 +12,6 @@ datasource db {
 
 // ---------------------------------------------------------------------------
 // Issue 3 — Create and seed IT request categories
-// Define a Category model with:
-//   id        Int      @id @default(autoincrement())
-//   name      String   @unique
-//   createdAt DateTime @default(now())
-// Then run:  npx prisma migrate dev --name init
 // ---------------------------------------------------------------------------
 
 model Category {
@@ -28,16 +23,39 @@ model Category {
 }
 
 // ---------------------------------------------------------------------------
-// Issue 15 — Lab 2 database schema and seed
+// Lab 3 — Users, roles, sessions, IT Staff workflow, comments/notes
+// docs/lab-03/specification.md §7. `User` replaces Lab 2's `RequesterUser`
+// via a rename migration (see prisma/migrations/*_lab3_users_and_workflow),
+// preserving existing ids so `Ticket.requesterId` never needed rewriting.
 // ---------------------------------------------------------------------------
 
-model RequesterUser {
+model User {
+  id                 Int             @id @default(autoincrement())
+  name               String
+  email              String          @unique
+  passwordHash       String
+  role               Role            @default(REQUESTER)
+  isActive           Boolean         @default(true)
+  mustChangePassword Boolean         @default(true)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  requestedTickets   Ticket[]        @relation("TicketRequester")
+  ownedTickets       Ticket[]        @relation("TicketOwner")
+  sessions           Session[]
+  publicComments     PublicComment[]
+  internalNotes      InternalNote[]
+}
+
+model Session {
   id        Int      @id @default(autoincrement())
-  name      String
-  email     String   @unique
-  isActive  Boolean  @default(true)
+  userId    Int
+  tokenHash String   @unique
   createdAt DateTime @default(now())
-  tickets   Ticket[]
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model RelatedSystem {
@@ -49,26 +67,34 @@ model RelatedSystem {
 }
 
 model Ticket {
-  id                Int           @id @default(autoincrement())
-  ticketNumber      String        @unique
-  requesterId       Int
-  categoryId        Int
-  relatedSystemId   Int
-  summary           String
-  description       String
-  requestedPriority Priority
-  status            TicketStatus  @default(NEW)
-  idempotencyKey    String
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  requester         RequesterUser @relation(fields: [requesterId], references: [id])
-  category          Category      @relation(fields: [categoryId], references: [id])
-  relatedSystem     RelatedSystem @relation(fields: [relatedSystemId], references: [id])
-  attachments       Attachment[]
+  id                           Int             @id @default(autoincrement())
+  ticketNumber                 String          @unique
+  requesterId                  Int
+  categoryId                   Int
+  relatedSystemId              Int
+  summary                      String
+  description                  String
+  requestedPriority            Priority
+  itPriority                   Priority
+  status                       TicketStatus    @default(NEW)
+  ownerId                      Int?
+  requesterIndicatedResolvedAt DateTime?
+  idempotencyKey               String
+  createdAt                    DateTime        @default(now())
+  updatedAt                    DateTime        @updatedAt
+  requester                    User            @relation("TicketRequester", fields: [requesterId], references: [id])
+  owner                        User?           @relation("TicketOwner", fields: [ownerId], references: [id])
+  category                     Category        @relation(fields: [categoryId], references: [id])
+  relatedSystem                RelatedSystem   @relation(fields: [relatedSystemId], references: [id])
+  attachments                  Attachment[]
+  publicComments               PublicComment[]
+  internalNotes                InternalNote[]
 
   @@unique([requesterId, idempotencyKey])
   @@index([requesterId])
   @@index([createdAt])
+  @@index([ownerId])
+  @@index([status])
 }
 
 model Attachment {
@@ -86,6 +112,30 @@ model Attachment {
   @@index([ticketId])
 }
 
+model PublicComment {
+  id        Int      @id @default(autoincrement())
+  ticketId  Int
+  authorId  Int
+  body      String
+  createdAt DateTime @default(now())
+  ticket    Ticket   @relation(fields: [ticketId], references: [id])
+  author    User     @relation(fields: [authorId], references: [id])
+
+  @@index([ticketId])
+}
+
+model InternalNote {
+  id        Int      @id @default(autoincrement())
+  ticketId  Int
+  authorId  Int
+  body      String
+  createdAt DateTime @default(now())
+  ticket    Ticket   @relation(fields: [ticketId], references: [id])
+  author    User     @relation(fields: [authorId], references: [id])
+
+  @@index([ticketId])
+}
+
 enum Priority {
   LOW
   MEDIUM
@@ -94,4 +144,17 @@ enum Priority {
 
 enum TicketStatus {
   NEW
+  OPEN
+  IN_PROGRESS
+  WAITING_FOR_REQUESTER
+  RESOLVED
+  CLOSED
+  REOPENED
+  CANCELLED
+}
+
+enum Role {
+  REQUESTER
+  IT_STAFF
+  ADMINISTRATOR
 }

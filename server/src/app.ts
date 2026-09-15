@@ -57,8 +57,8 @@ app.get("/api/categories", async (_req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 app.get("/api/requesters", async (_req: Request, res: Response) => {
   try {
-    const requesters = await getPrisma().requesterUser.findMany({
-      where: { isActive: true },
+    const requesters = await getPrisma().user.findMany({
+      where: { isActive: true, role: "REQUESTER" },
       orderBy: { id: "asc" },
       select: { id: true, name: true },
     });
@@ -76,7 +76,7 @@ app.get("/api/requesters", async (_req: Request, res: Response) => {
 
 // api-spec.md §0.1 — the same X-Requester-Id check for every Ticket/
 // Attachment endpoint: 400 if missing/non-integer, 403 if not an active
-// RequesterUser, otherwise proceeds scoped to that Requester.
+// User with role REQUESTER, otherwise proceeds scoped to that Requester.
 type RequesterCheck =
   | { ok: true; requesterId: number }
   | {
@@ -109,8 +109,8 @@ async function checkRequester(
       },
     };
   }
-  const requester = await getPrisma().requesterUser.findUnique({ where: { id: requesterId } });
-  if (!requester || !requester.isActive) {
+  const requester = await getPrisma().user.findUnique({ where: { id: requesterId } });
+  if (!requester || !requester.isActive || requester.role !== "REQUESTER") {
     return { ok: false, status: 403, body: { error: "Selected Requester is not active" } };
   }
   return { ok: true, requesterId };
@@ -254,6 +254,8 @@ app.post("/api/tickets", async (req: Request, res: Response) => {
             summary: value.summary,
             description: value.description,
             requestedPriority: value.requestedPriority,
+            // BR-17: IT Priority starts equal to Requested Priority.
+            itPriority: value.requestedPriority,
             status: "NEW",
             idempotencyKey,
           },

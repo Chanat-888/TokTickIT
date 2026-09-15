@@ -15,7 +15,7 @@ const { getPrisma } = await import("../../src/prisma.js");
 
 async function truncateAll() {
   await getPrisma().$executeRawUnsafe(
-    `TRUNCATE TABLE "Attachment", "Ticket", "RequesterUser", "RelatedSystem", "Category" RESTART IDENTITY CASCADE;`,
+    `TRUNCATE TABLE "Attachment", "Ticket", "User", "RelatedSystem", "Category" RESTART IDENTITY CASCADE;`,
   );
 }
 
@@ -28,7 +28,9 @@ async function seedRelatedSystem(name: string, isActive = true) {
 }
 
 async function seedRequester(name: string, email: string, isActive = true) {
-  return getPrisma().requesterUser.create({ data: { name, email, isActive } });
+  return getPrisma().user.create({
+    data: { name, email, isActive, passwordHash: "unused-in-lab2-tests", role: "REQUESTER" },
+  });
 }
 
 let ticketCounter = 1;
@@ -41,6 +43,7 @@ async function seedTicket(params: {
   createdAt?: Date;
 }) {
   const n = ticketCounter++;
+  const requestedPriority = params.requestedPriority ?? "MEDIUM";
   return getPrisma().ticket.create({
     data: {
       ticketNumber: `TKT-2026-${String(n).padStart(6, "0")}`,
@@ -49,7 +52,8 @@ async function seedTicket(params: {
       relatedSystemId: params.relatedSystemId,
       summary: params.summary ?? `Ticket summary ${n}`,
       description: "Default description long enough for validation purposes.",
-      requestedPriority: params.requestedPriority ?? "MEDIUM",
+      requestedPriority,
+      itPriority: requestedPriority,
       status: "NEW",
       idempotencyKey: randomUUID(),
       createdAt: params.createdAt,
