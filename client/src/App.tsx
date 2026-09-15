@@ -8,6 +8,7 @@ import MyTickets from "./screens/MyTickets.js";
 import TicketDetail from "./screens/TicketDetail.js";
 import StaffTicketQueue from "./screens/StaffTicketQueue.js";
 import StaffTicketDetail from "./screens/StaffTicketDetail.js";
+import UserManagement from "./screens/UserManagement.js";
 import { AuthProvider, useAuth } from "./lib/authContext.js";
 import StateBanner from "./components/StateBanner.js";
 
@@ -24,6 +25,31 @@ function RequireAuth({ children }: { children: ReactNode }) {
   }
   if (user!.mustChangePassword) {
     return <Navigate to="/change-password" replace />;
+  }
+  return <>{children}</>;
+}
+
+// api-spec.md §4 — Administrator-only screen; a non-Administrator lands on
+// the same forbidden treatment the API itself returns (403).
+function RequireAdmin({ children }: { children: ReactNode }) {
+  const { status, user } = useAuth();
+  if (status === "loading") {
+    return <StateBanner variant="loading">Loading…</StateBanner>;
+  }
+  if (status === "unauthenticated") {
+    return <Navigate to="/login" replace />;
+  }
+  if (user!.mustChangePassword) {
+    return <Navigate to="/change-password" replace />;
+  }
+  if (user!.role !== "ADMINISTRATOR") {
+    return (
+      <AppShell>
+        <StateBanner variant="error">
+          <p>You don't have access to this screen.</p>
+        </StateBanner>
+      </AppShell>
+    );
   }
   return <>{children}</>;
 }
@@ -141,6 +167,16 @@ function AppRoutes() {
               <StaffTicketDetail />
             </AppShell>
           </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/users"
+        element={
+          <RequireAdmin>
+            <AppShell>
+              <UserManagement />
+            </AppShell>
+          </RequireAdmin>
         }
       />
       <Route
