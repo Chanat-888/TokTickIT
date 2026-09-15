@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import multer from "multer";
 import path from "node:path";
 import { createReadStream } from "node:fs";
@@ -9,6 +10,18 @@ import { getPrisma } from "./prisma.js";
 import { generateTicketNumber } from "./ticketNumber.js";
 import { validateTicketInput } from "./ticketValidation.js";
 import { storeUploadedFile, UPLOADS_DIR } from "./uploads.js";
+import {
+  SESSION_COOKIE_NAME,
+  createSession,
+  deleteSession,
+  deleteOtherSessions,
+  hashPassword,
+  isValidPassword,
+  toUserRepresentation,
+  verifyPassword,
+  verifyPasswordForUnknownEmail,
+} from "./auth.js";
+import { requireAuth, requirePasswordChanged, requireRole } from "./middleware.js";
 // getPrisma() is your lazy database handle. Call it INSIDE a route when you
 // need the DB.
 
@@ -16,8 +29,29 @@ import { storeUploadedFile, UPLOADS_DIR } from "./uploads.js";
 // Supertest can import `app` without opening a port. Do not merge these files.
 export const app = express();
 
-app.use(cors());          // already wired: lets the Vite dev server call this API
+// docs/lab-03/specification.md §11.3 — the client runs on a different port
+// (same site, cross-origin), so cookies need an explicit allowed origin and
+// credentials:true; a wildcard origin cannot be combined with credentials.
+const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? "http://localhost:5173";
+app.use(cors({ origin: CLIENT_ORIGIN, credentials: true }));
 app.use(express.json());
+app.use(cookieParser());
+
+const SESSION_COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: process.env.NODE_ENV === "production",
+};
+
+// docs/lab-03/api-spec.md §0.1/§0.2 — applied per-route below, not as a
+// blanket /api mount: /api/health, /api/categories, and /api/related-systems
+// stay unauthenticated, unchanged from Lab 2 (categories.test.ts and the
+// reference-data checks in create-ticket.api.test.ts depend on this). Every
+// Ticket/Attachment route gets [requireAuth, requirePasswordChanged,
+// requireRole("REQUESTER")] explicitly; /auth/logout, /auth/me, and
+// /auth/change-password get requireAuth alone, since those three must stay
+// reachable while mustChangePassword is still true.
+const requireRequester = [requireAuth, requirePasswordChanged, requireRole("REQUESTER")];
 
 // ---------------------------------------------------------------------------
 // Issue 2 — API health check
@@ -26,6 +60,110 @@ app.use(express.json());
 // ---------------------------------------------------------------------------
 app.get("/api/health", (_req: Request, res: Response) => {
   res.status(200).json({ status: "ok", service: "TokTickIT API" });
+});
+
+// ---------------------------------------------------------------------------
+// Lab 3 — Authentication (docs/lab-03/api-spec.md §1)
+// ---------------------------------------------------------------------------
+
+// BR-09: unknown email and wrong password return the identical message.
+const INVALID_CREDENTIALS_BODY = { error: "Invalid email or password" };
+
+app.post("/auth/login", async (req: Request, res: Response) => {
+  try {
+    const body = (req.body ?? {}) as { email?: unknown; password?: unknown };
+    if (typeof body.email !== "string" || typeof body.password !== "string" || !body.email.trim() || !body.password) {
+      return res.status(400).json({
+        errors: [{ field: "email", message: "Email and password are required" }],
+      });
+    }
+
+    const user = await getPrisma().user.findUnique({
+      where: { email: body.email.trim().toLowerCase() },
+    });
+    if (!user) {
+      // BR-09: run the same-cost dummy compare so timing doesn't reveal that
+      // this email has no account.
+      await verifyPasswordForUnknownEmail(body.password);
+      return res.status(401).json(INVALID_CREDENTIALS_BODY);
+    }
+    if (!(await verifyPassword(body.password, user.passwordHash))) {
+      return res.status(401).json(INVALID_CREDENTIALS_BODY);
+    }
+    // BR-10: correct credentials, inactive account — distinct 403, checked
+    // only once credentials are confirmed correct (never reveals inactive
+    // state for a wrong password).
+    if (!user.isActive) {
+      return res.status(403).json({ error: "This account is inactive" });
+    }
+
+    const { token, expiresAt } = await createSession(user.id);
+    res.cookie(SESSION_COOKIE_NAME, token, { ...SESSION_COOKIE_OPTIONS, expires: expiresAt });
+    return res.status(200).json(toUserRepresentation(user));
+  } catch (err) {
+    console.error("POST /auth/login failed:", err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
+app.post("/auth/logout", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const token = req.cookies?.[SESSION_COOKIE_NAME] as string | undefined;
+    if (token) await deleteSession(token);
+    res.clearCookie(SESSION_COOKIE_NAME, SESSION_COOKIE_OPTIONS);
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("POST /auth/logout failed:", err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
+app.get("/auth/me", requireAuth, (req: Request, res: Response) => {
+  res.status(200).json(toUserRepresentation(req.user!));
+});
+
+app.post("/auth/change-password", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const body = (req.body ?? {}) as { currentPassword?: unknown; newPassword?: unknown };
+    if (typeof body.currentPassword !== "string" || typeof body.newPassword !== "string") {
+      return res.status(400).json({
+        errors: [{ field: "newPassword", message: "Current and new password are required" }],
+      });
+    }
+
+    const user = req.user!;
+    if (!(await verifyPassword(body.currentPassword, user.passwordHash))) {
+      return res.status(401).json({ error: "Current password is incorrect" });
+    }
+    if (!isValidPassword(body.newPassword) || body.newPassword === body.currentPassword) {
+      return res.status(400).json({
+        errors: [
+          {
+            field: "newPassword",
+            message:
+              body.newPassword === body.currentPassword
+                ? "New password must be different from the current password"
+                : "Password must be at least 8 characters and include a letter and a digit",
+          },
+        ],
+      });
+    }
+
+    const passwordHash = await hashPassword(body.newPassword);
+    const updated = await getPrisma().user.update({
+      where: { id: user.id },
+      data: { passwordHash, mustChangePassword: false },
+    });
+
+    // BR-35: invalidate the user's other active sessions; keep this one.
+    const token = req.cookies?.[SESSION_COOKIE_NAME] as string;
+    await deleteOtherSessions(user.id, token);
+
+    return res.status(200).json(toUserRepresentation(updated));
+  } catch (err) {
+    console.error("POST /auth/change-password failed:", err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -50,71 +188,9 @@ app.get("/api/categories", async (_req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
-// Issue 17 — Development Requester list
-// Active Requesters only, { id, name } — email is never returned
-// (api-spec.md §12 OQ-6). No X-Requester-Id header required (§0.1): this is
-// the endpoint that runs before a Requester is chosen.
-// ---------------------------------------------------------------------------
-app.get("/api/requesters", async (_req: Request, res: Response) => {
-  try {
-    const requesters = await getPrisma().user.findMany({
-      where: { isActive: true, role: "REQUESTER" },
-      orderBy: { id: "asc" },
-      select: { id: true, name: true },
-    });
-    res.status(200).json(requesters);
-  } catch (err) {
-    console.error("GET /api/requesters failed:", err);
-    res.status(500).json({ error: "Unexpected server error" });
-  }
-});
-
-// ---------------------------------------------------------------------------
 // Issue 18 — Create Ticket
 // Shared helpers used by every Ticket/Attachment endpoint below.
 // ---------------------------------------------------------------------------
-
-// api-spec.md §0.1 — the same X-Requester-Id check for every Ticket/
-// Attachment endpoint: 400 if missing/non-integer, 403 if not an active
-// User with role REQUESTER, otherwise proceeds scoped to that Requester.
-type RequesterCheck =
-  | { ok: true; requesterId: number }
-  | {
-      ok: false;
-      status: 400 | 403;
-      body: { errors: { field: string; message: string }[] } | { error: string };
-    };
-
-// `allowQueryFallback` is a deviation scoped to the attachment download
-// route only (api-spec.md §9, TASK 4 of Issue #21): a plain <a href> can't
-// carry a custom header on browser navigation, so that one route also
-// accepts a `?requesterId=` query param when the header is absent. The
-// header still wins whenever both are present.
-async function checkRequester(
-  req: Request,
-  options?: { allowQueryFallback?: boolean },
-): Promise<RequesterCheck> {
-  let raw = req.header("X-Requester-Id");
-  if (raw === undefined && options?.allowQueryFallback) {
-    const queryValue = req.query.requesterId;
-    if (typeof queryValue === "string") raw = queryValue;
-  }
-  const requesterId = raw !== undefined && /^\d+$/.test(raw.trim()) ? Number(raw.trim()) : NaN;
-  if (!Number.isInteger(requesterId)) {
-    return {
-      ok: false,
-      status: 400,
-      body: {
-        errors: [{ field: "X-Requester-Id", message: "Missing or invalid requester header" }],
-      },
-    };
-  }
-  const requester = await getPrisma().user.findUnique({ where: { id: requesterId } });
-  if (!requester || !requester.isActive || requester.role !== "REQUESTER") {
-    return { ok: false, status: 403, body: { error: "Selected Requester is not active" } };
-  }
-  return { ok: true, requesterId };
-}
 
 // api-spec.md §0.3 — the shared Ticket representation (no idempotencyKey,
 // no attachments field on this endpoint's shape).
@@ -186,13 +262,9 @@ app.get("/api/related-systems", async (_req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 // Issue 18 — Create Ticket (api-spec.md §4)
 // ---------------------------------------------------------------------------
-app.post("/api/tickets", async (req: Request, res: Response) => {
+app.post("/api/tickets", requireRequester, async (req: Request, res: Response) => {
   try {
-    const requesterCheck = await checkRequester(req);
-    if (!requesterCheck.ok) {
-      return res.status(requesterCheck.status).json(requesterCheck.body);
-    }
-    const { requesterId } = requesterCheck;
+    const requesterId = req.user!.id;
 
     // BR-11: Idempotency-Key is required and must be a valid UUID (any
     // version).
@@ -340,14 +412,11 @@ function handleAttachmentUpload(req: Request, res: Response, next: NextFunction)
 
 app.post(
   "/api/tickets/:id/attachments",
+  requireRequester,
   handleAttachmentUpload,
   async (req: Request, res: Response) => {
     try {
-      const requesterCheck = await checkRequester(req);
-      if (!requesterCheck.ok) {
-        return res.status(requesterCheck.status).json(requesterCheck.body);
-      }
-      const { requesterId } = requesterCheck;
+      const requesterId = req.user!.id;
 
       const files = (req.files as Express.Multer.File[] | undefined) ?? [];
 
@@ -453,13 +522,9 @@ function clampPage(raw: string | undefined): number {
   return truncated < 1 ? 1 : truncated;
 }
 
-app.get("/api/tickets", async (req: Request, res: Response) => {
+app.get("/api/tickets", requireRequester, async (req: Request, res: Response) => {
   try {
-    const requesterCheck = await checkRequester(req);
-    if (!requesterCheck.ok) {
-      return res.status(requesterCheck.status).json(requesterCheck.body);
-    }
-    const { requesterId } = requesterCheck;
+    const requesterId = req.user!.id;
 
     const errors: { field: string; message: string }[] = [];
 
@@ -576,13 +641,9 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 // Issue 20 — Ticket Detail (api-spec.md §6)
 // ---------------------------------------------------------------------------
-app.get("/api/tickets/:id", async (req: Request, res: Response) => {
+app.get("/api/tickets/:id", requireRequester, async (req: Request, res: Response) => {
   try {
-    const requesterCheck = await checkRequester(req);
-    if (!requesterCheck.ok) {
-      return res.status(requesterCheck.status).json(requesterCheck.body);
-    }
-    const { requesterId } = requesterCheck;
+    const requesterId = req.user!.id;
 
     // Not an integer id — treated as not-found, not a 400 (api-spec.md §6,
     // this endpoint defines no 400 case).
@@ -646,17 +707,13 @@ async function findOwnedAttachment(
 // 404 for being removed (that rule is download-specific, §9).
 app.get(
   "/api/tickets/:ticketId/attachments/:attachmentId",
+  requireRequester,
   async (req: Request, res: Response) => {
     try {
-      const requesterCheck = await checkRequester(req);
-      if (!requesterCheck.ok) {
-        return res.status(requesterCheck.status).json(requesterCheck.body);
-      }
-
       const attachment = await findOwnedAttachment(
         req.params.ticketId,
         req.params.attachmentId,
-        requesterCheck.requesterId,
+        req.user!.id,
       );
       if (!attachment) {
         return res.status(404).json({ error: "Not found" });
@@ -675,20 +732,19 @@ app.get(
 
 // api-spec.md §9 — streams the file; also serves as "preview" per BR-35. A
 // removed Attachment 404s here even for its own owner (BR-32, AC-21) — the
-// only one of the three routes where isRemoved changes the response.
+// only one of the three routes where isRemoved changes the response. The
+// Lab 2 `?requesterId=` query fallback for plain `<a href>` navigation is
+// gone: the session cookie is sent automatically on same-site navigation,
+// so the header-only workaround it existed for no longer applies.
 app.get(
   "/api/tickets/:ticketId/attachments/:attachmentId/download",
+  requireRequester,
   async (req: Request, res: Response) => {
     try {
-      const requesterCheck = await checkRequester(req, { allowQueryFallback: true });
-      if (!requesterCheck.ok) {
-        return res.status(requesterCheck.status).json(requesterCheck.body);
-      }
-
       const attachment = await findOwnedAttachment(
         req.params.ticketId,
         req.params.attachmentId,
-        requesterCheck.requesterId,
+        req.user!.id,
       );
       if (!attachment || attachment.removedAt !== null) {
         return res.status(404).json({ error: "Not found" });
@@ -725,13 +781,9 @@ app.get(
 // the underlying file (BR-31), and never touches server/src/uploads.ts.
 app.delete(
   "/api/tickets/:ticketId/attachments/:attachmentId",
+  requireRequester,
   async (req: Request, res: Response) => {
     try {
-      const requesterCheck = await checkRequester(req);
-      if (!requesterCheck.ok) {
-        return res.status(requesterCheck.status).json(requesterCheck.body);
-      }
-
       // BR-34 — checked on the raw length, no trimming (api-spec.md §8
       // OQ-TEST-2 / API-60); checked before the 404 ownership lookup, same
       // 400-before-404 convention as upload (api-spec.md §12 OQ-9).
@@ -746,7 +798,7 @@ app.delete(
       const attachment = await findOwnedAttachment(
         req.params.ticketId,
         req.params.attachmentId,
-        requesterCheck.requesterId,
+        req.user!.id,
       );
       if (!attachment) {
         return res.status(404).json({ error: "Not found" });

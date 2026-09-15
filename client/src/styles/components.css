@@ -128,10 +128,41 @@
   color: var(--color-error);
 }
 
-.badge--status-new {
+.badge--status-new,
+.badge--status-open,
+.badge--status-in_progress,
+.badge--status-waiting_for_requester,
+.badge--status-reopened {
   background: var(--color-pale-green);
   border-color: var(--color-secondary-green);
   color: var(--color-secondary-green);
+}
+
+/* docs/lab-03/ui-spec.md §2 — terminal statuses render muted, not by
+   deleting the badge's meaning, just lowering its emphasis. Full badge
+   polish (icons, exact palette) lands with the IT Staff Queue in a later
+   phase; this keeps My Tickets non-crashing and legible meanwhile. */
+.badge--status-resolved,
+.badge--status-closed,
+.badge--status-cancelled {
+  background: var(--color-page-bg);
+  border-color: var(--color-text-muted);
+  color: var(--color-text-muted);
+}
+
+/* docs/lab-03/ui-spec.md §2 — Role badge: neutral pill, never colour-coded
+   to imply rank. */
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-badge);
+  border: 1px solid var(--color-field-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -283,10 +314,11 @@
 }
 
 /* ---------------------------------------------------------------------- */
-/* Requester Selection — ui-spec.md §11, §19                              */
+/* Login / Change Password — ui-spec.md §5.1, §5.2, §7                    */
+/* Centered card, unauthenticated (no app shell) — same layout for both.  */
 /* ---------------------------------------------------------------------- */
 
-.requester-select {
+.auth-screen {
   max-width: 420px;
   margin: var(--space-3xl) auto;
   padding: var(--space-xl);
@@ -297,18 +329,13 @@
   gap: var(--space-md);
 }
 
-.requester-select__dropdown {
-  height: var(--control-height);
-  padding: 0 var(--space-md);
-  border-radius: var(--radius-control);
-  border: 1px solid var(--color-field-border);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font-family: var(--font-family-base);
-  font-size: var(--font-size-body);
+.auth-screen form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
 }
 
-.requester-select__continue-btn {
+.auth-screen .btn {
   align-self: flex-start;
 }
 
