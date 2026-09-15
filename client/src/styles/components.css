@@ -813,6 +813,34 @@ textarea.field__control {
   gap: var(--space-xs);
 }
 
+/* docs/lab-03/ui-spec.md §5.6, §7 — IT Staff Operations panel (Owner/IT
+   Priority/Status). Owner/IT Priority controls use the shared editable
+   .field__control styling (vs. the read-only fields above); .owner-select
+   and .status-select exist as hooks for that ui-spec class table, no
+   distinct look of their own beyond .field__control. */
+.ticket-ops-panel {
+  padding: var(--space-xl);
+  background: var(--color-surface);
+  border-radius: var(--radius-control);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* docs/lab-03/ui-spec.md §5.6, §7 — confirms a Status change to Cancelled/
+   Closed before the request is sent; same structure as Lab 2's
+   .attachment-remove-confirm, kept as its own class since it confirms a
+   different action. */
+.confirm-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-page-bg);
+}
+
 /* ---------------------------------------------------------------------- */
 /* Public Comments — docs/lab-03/ui-spec.md §3, §19                       */
 /* ---------------------------------------------------------------------- */
@@ -828,6 +856,20 @@ textarea.field__control {
 .comment-panel--public {
   background: var(--color-pale-green);
   border: 1px solid var(--color-secondary-green);
+}
+
+/* docs/lab-03/ui-spec.md §3, §7 — visually distinct from Public Comments'
+   green (restricted/internal-only content gets the warning palette, not a
+   second shade of the same green). */
+.comment-panel--internal {
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+}
+
+.comment-tabs {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
 }
 
 .comment-panel__header {
