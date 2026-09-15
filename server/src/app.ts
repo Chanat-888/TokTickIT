@@ -896,7 +896,9 @@ app.post("/api/tickets/:id/comments", requireAnyRole, async (req: Request, res: 
     }
 
     const created = await getPrisma().publicComment.create({
-      data: { ticketId: ticket.id, authorId: req.user!.id, body: body.body as string },
+      // BR-21 trims for the empty/length check; trim for storage too so a
+      // comment's saved body matches what was actually validated.
+      data: { ticketId: ticket.id, authorId: req.user!.id, body: (body.body as string).trim() },
       include: { author: true },
     });
 
@@ -950,10 +952,16 @@ app.post(
         return res.status(404).json({ error: "Not found" });
       }
 
-      const updated = await getPrisma().ticket.update({
-        where: { id: ticket.id },
-        data: { requesterIndicatedResolvedAt: new Date() },
-      });
+      // BR-24 records *when the Requester first indicated this* — a second
+      // call (the client already hides the control, but the endpoint stays
+      // reachable directly) returns the Ticket unchanged rather than
+      // overwriting the original timestamp.
+      const updated = ticket.requesterIndicatedResolvedAt
+        ? ticket
+        : await getPrisma().ticket.update({
+            where: { id: ticket.id },
+            data: { requesterIndicatedResolvedAt: new Date() },
+          });
 
       return res.status(200).json(ticketToJSON(updated));
     } catch (err) {
