@@ -15,6 +15,9 @@ type StatusValue =
 interface BadgeProps {
   kind: "priority" | "status";
   value: PriorityValue | StatusValue;
+  // ui-spec.md §7 `.priority-badge--it` — marks this pill as the IT
+  // Priority column rather than Requested Priority.
+  itPriority?: boolean;
 }
 
 const PRIORITY_META: Record<PriorityValue, { icon: string; label: string }> = {
@@ -34,15 +37,18 @@ const STATUS_META: Record<StatusValue, { icon: string; label: string }> = {
   CANCELLED: { icon: "✕", label: "Cancelled" },
 };
 
-export default function Badge({ kind, value }: BadgeProps) {
+export default function Badge({ kind, value, itPriority }: BadgeProps) {
   const meta =
     kind === "priority"
       ? PRIORITY_META[value as PriorityValue]
       : STATUS_META[value as StatusValue];
+  // ui-spec.md §2/§7 — Closed/Cancelled render muted via the shared
+  // `.status-badge--terminal` modifier, on top of their own status color.
+  const isTerminalStatus = kind === "status" && (value === "CLOSED" || value === "CANCELLED");
   const modifier =
     kind === "priority"
-      ? `badge--priority-${value.toLowerCase()}`
-      : `badge--status-${value.toLowerCase()}`;
+      ? `badge--priority-${value.toLowerCase()}${itPriority ? " priority-badge--it" : ""}`
+      : `badge--status-${value.toLowerCase()}${isTerminalStatus ? " status-badge--terminal" : ""}`;
 
   return (
     <span className={`badge ${modifier}`}>

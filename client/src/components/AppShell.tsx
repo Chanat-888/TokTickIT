@@ -41,6 +41,11 @@ export default function AppShell({ children }: AppShellProps) {
               </NavLink>
             </>
           )}
+          {(user?.role === "IT_STAFF" || user?.role === "ADMINISTRATOR") && (
+            <NavLink to="/staff/tickets" className={navLinkClassName}>
+              Ticket Queue
+            </NavLink>
+          )}
         </nav>
 
         <span className="app-shell__requester">{user?.name ?? ""}</span>

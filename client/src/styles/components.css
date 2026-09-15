@@ -132,22 +132,28 @@
 .badge--status-open,
 .badge--status-in_progress,
 .badge--status-waiting_for_requester,
-.badge--status-reopened {
+.badge--status-reopened,
+.badge--status-resolved {
   background: var(--color-pale-green);
   border-color: var(--color-secondary-green);
   color: var(--color-secondary-green);
 }
 
-/* docs/lab-03/ui-spec.md §2 — terminal statuses render muted, not by
-   deleting the badge's meaning, just lowering its emphasis. Full badge
-   polish (icons, exact palette) lands with the IT Staff Queue in a later
-   phase; this keeps My Tickets non-crashing and legible meanwhile. */
-.badge--status-resolved,
-.badge--status-closed,
-.badge--status-cancelled {
+/* docs/lab-03/ui-spec.md §2/§7 — Closed/Cancelled render muted via the
+   shared `.status-badge--terminal` modifier (Resolved keeps the active
+   green treatment above — it isn't a terminal state, a Ticket can still
+   reopen from it). */
+.status-badge--terminal {
   background: var(--color-page-bg);
   border-color: var(--color-text-muted);
   color: var(--color-text-muted);
+}
+
+/* docs/lab-03/ui-spec.md §7 — IT Priority pill, positioned right of
+   Requested Priority; dashed border distinguishes it as the IT-assigned
+   value rather than the Requester's original submission. */
+.priority-badge--it {
+  border-style: dashed;
 }
 
 /* docs/lab-03/ui-spec.md §2 — Role badge: neutral pill, never colour-coded
@@ -162,6 +168,22 @@
   color: var(--color-text-muted);
   font-size: var(--font-size-small);
   font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ui-spec.md §5.5 — Queue Owner column: the owning user's name, or this
+   muted chip instead of a blank cell when ownerId is null. Same neutral
+   treatment as .role-badge. */
+.owner-chip--unassigned {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-badge);
+  border: 1px solid var(--color-field-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+  font-style: italic;
   white-space: nowrap;
 }
 

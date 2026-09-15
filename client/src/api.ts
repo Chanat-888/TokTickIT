@@ -311,6 +311,72 @@ export function downloadAttachmentUrl(ticketId: number, attachmentId: number): s
 // specific "already removed" message if that race occurs.
 export class AlreadyRemovedError extends Error {}
 
+// api-spec.md §0.4 — the staff view adds itPriority and ownerId on top of
+// the Requester-facing Ticket shape.
+export interface StaffTicket extends Ticket {
+  itPriority: Priority;
+  ownerId: number | null;
+}
+
+export interface StaffTicketListResult {
+  data: StaffTicket[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface StaffTicketListParams {
+  search?: string;
+  status?: TicketStatus;
+  itPriority?: Priority;
+  ownerId?: number | "unassigned";
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+  page?: number;
+  pageSize?: number;
+}
+
+// Issue 40 — IT Staff Ticket Queue (api-spec.md §3). Every control on this
+// screen only ever sends values it itself defined, so — like getTickets —
+// a non-2xx status is thrown rather than returned as form data.
+export async function getStaffTickets(params: StaffTicketListParams): Promise<StaffTicketListResult> {
+  const query = new URLSearchParams();
+  if (params.search !== undefined) query.set("search", params.search);
+  if (params.status !== undefined) query.set("status", params.status);
+  if (params.itPriority !== undefined) query.set("itPriority", params.itPriority);
+  if (params.ownerId !== undefined) query.set("ownerId", String(params.ownerId));
+  if (params.sortBy !== undefined) query.set("sortBy", params.sortBy);
+  if (params.sortDir !== undefined) query.set("sortDir", params.sortDir);
+  if (params.page !== undefined) query.set("page", String(params.page));
+  if (params.pageSize !== undefined) query.set("pageSize", String(params.pageSize));
+
+  const qs = query.toString();
+  const res = await apiFetch(`/api/staff/tickets${qs ? `?${qs}` : ""}`);
+  if (!res.ok) {
+    throw new Error(`Staff tickets fetch failed with status ${res.status}`);
+  }
+  return (await res.json()) as StaffTicketListResult;
+}
+
+// api-spec.md §3 — active IT Staff/Administrator users, for resolving a
+// Ticket's ownerId to a display name on the Queue (the staff Ticket
+// representation carries only the id).
+export interface AssignableUser {
+  id: number;
+  name: string;
+  role: Role;
+}
+
+export async function getAssignableUsers(): Promise<AssignableUser[]> {
+  const res = await apiFetch("/api/staff/assignable-users");
+  if (!res.ok) {
+    throw new Error(`Assignable users fetch failed with status ${res.status}`);
+  }
+  const body = (await res.json()) as { data: AssignableUser[] };
+  return body.data;
+}
+
 // Issue 21 — soft-remove an Attachment (api-spec.md §10, BR-31/BR-34).
 export async function removeAttachment(
   ticketId: number,

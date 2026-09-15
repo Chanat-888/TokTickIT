@@ -6,6 +6,7 @@ import ChangePassword from "./screens/ChangePassword.js";
 import CreateTicketForm from "./screens/CreateTicketForm.js";
 import MyTickets from "./screens/MyTickets.js";
 import TicketDetail from "./screens/TicketDetail.js";
+import StaffTicketQueue from "./screens/StaffTicketQueue.js";
 import { AuthProvider, useAuth } from "./lib/authContext.js";
 import StateBanner from "./components/StateBanner.js";
 
@@ -47,13 +48,17 @@ function LoginRoute() {
   return <Login />;
 }
 
-// FR-05 — role-specific home; IT Staff/Administrator screens are built in
-// later phases, so they land on a simple holding screen for now rather than
-// a broken link.
+// FR-05 — role-specific home. Administrator also has nav access to the
+// Ticket Queue (ui-spec.md §5.3), so both roles land there; User
+// Management (Administrator's own screen) is a later phase, reached via
+// its own future nav link rather than Home.
 function Home() {
   const { user } = useAuth();
   if (user?.role === "REQUESTER") {
     return <Navigate to="/tickets" replace />;
+  }
+  if (user?.role === "IT_STAFF" || user?.role === "ADMINISTRATOR") {
+    return <Navigate to="/staff/tickets" replace />;
   }
   return (
     <AppShell>
@@ -113,6 +118,16 @@ function AppRoutes() {
           <RequireAuth>
             <AppShell>
               <TicketDetail />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/staff/tickets"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <StaffTicketQueue />
             </AppShell>
           </RequireAuth>
         }
