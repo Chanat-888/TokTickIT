@@ -1071,6 +1071,23 @@ app.get("/api/staff/tickets", requireStaff, async (req: Request, res: Response) 
       }
     }
 
+    // "unassigned" or an integer user id (api-spec.md §3). Validated
+    // alongside status/itPriority/sortBy/sortDir/pageSize rather than
+    // silently ignored on a bad value — an unrecognized ownerId otherwise
+    // reads as "no filter" and returns the whole unfiltered queue, masking
+    // a typo instead of surfacing it.
+    let ownerId: number | "unassigned" | undefined;
+    if (req.query.ownerId !== undefined) {
+      const raw = String(req.query.ownerId);
+      if (raw === "unassigned") {
+        ownerId = "unassigned";
+      } else if (/^\d+$/.test(raw)) {
+        ownerId = Number(raw);
+      } else {
+        errors.push({ field: "ownerId", message: "ownerId must be \"unassigned\" or an integer user id" });
+      }
+    }
+
     const pageSizeResult = resolveStaffPageSize(
       req.query.pageSize !== undefined ? String(req.query.pageSize) : undefined,
     );
@@ -1090,18 +1107,8 @@ app.get("/api/staff/tickets", requireStaff, async (req: Request, res: Response) 
     if (status !== undefined) where.status = status as Prisma.TicketWhereInput["status"];
     if (itPriority !== undefined) where.itPriority = itPriority;
     if (requestedPriority !== undefined) where.requestedPriority = requestedPriority;
-    if (req.query.ownerId !== undefined) {
-      // "unassigned" or an integer id (api-spec.md §3); any other value is
-      // left unfiltered rather than 400 — the UI only ever sends one of
-      // those two forms or omits the param, and ownerId isn't in the
-      // documented 400 list.
-      const raw = String(req.query.ownerId);
-      if (raw === "unassigned") {
-        where.ownerId = null;
-      } else if (/^\d+$/.test(raw)) {
-        where.ownerId = Number(raw);
-      }
-    }
+    if (ownerId === "unassigned") where.ownerId = null;
+    else if (typeof ownerId === "number") where.ownerId = ownerId;
     if (search) {
       where.OR = [
         { ticketNumber: { startsWith: search } },

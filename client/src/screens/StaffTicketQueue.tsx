@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getAssignableUsers,
@@ -89,9 +89,16 @@ export default function StaffTicketQueue() {
       .catch(() => {});
   }, []);
 
-  // ui-spec.md §13.1 — ~300ms debounce before triggering a refetch.
+  // ui-spec.md §13.1 — ~300ms debounce before triggering a refetch. Resets
+  // page in the same batch as the debounced value (React 18 auto-batches
+  // both setState calls into one render), rather than in a separate effect
+  // keyed on the filters — that would fire one fetch with the stale page,
+  // then a second right after, a wasted request and a flash of wrong rows.
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchInput), 300);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput);
+      setPage(1);
+    }, 300);
     return () => clearTimeout(timer);
   }, [searchInput]);
 
@@ -116,20 +123,28 @@ export default function StaffTicketQueue() {
   );
 
   // A page number left over from a more-filtered view can point past the
-  // end of a less-filtered result set (same reasoning as My Tickets).
-  useEffect(() => {
-    setPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, statusFilter, itPriorityFilter, ownerFilter]);
+  // end of a less-filtered result set (same reasoning as My Tickets). Each
+  // filter's own change handler resets page to 1 directly (see the Status/
+  // IT Priority/Owner selects and the search debounce above) instead of a
+  // shared effect keyed on the filter values, which would fire one fetch
+  // with the stale page before a second one landed on page 1.
+
+  // Guards against out-of-order responses: two quick sort/filter/page
+  // changes can resolve in reverse network order, otherwise leaving a
+  // stale result on screen after a newer request already returned.
+  const latestRequestId = useRef(0);
 
   const load = useCallback(() => {
+    const requestId = ++latestRequestId.current;
     setLoadState("loading");
     getStaffTickets(params)
       .then((res) => {
+        if (latestRequestId.current !== requestId) return;
         setResult(res);
         setLoadState("loaded");
       })
       .catch((err: unknown) => {
+        if (latestRequestId.current !== requestId) return;
         const status = err instanceof Error ? Number(err.message.match(/status (\d+)/)?.[1]) : undefined;
         setLoadState(status === 403 ? "forbidden" : "error");
       });
@@ -157,6 +172,21 @@ export default function StaffTicketQueue() {
 
   function handlePageSizeChange(value: string) {
     setPageSize(Number(value));
+    setPage(1);
+  }
+
+  function handleStatusFilterChange(value: TicketStatus | "") {
+    setStatusFilter(value);
+    setPage(1);
+  }
+
+  function handleItPriorityFilterChange(value: string) {
+    setItPriorityFilter(value);
+    setPage(1);
+  }
+
+  function handleOwnerFilterChange(value: OwnerFilter) {
+    setOwnerFilter(value);
     setPage(1);
   }
 
@@ -217,7 +247,7 @@ export default function StaffTicketQueue() {
             className="ticket-toolbar__filter"
             aria-label="Status"
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as TicketStatus | "")}
+            onChange={(e) => handleStatusFilterChange(e.target.value as TicketStatus | "")}
           >
             <option value="">All Statuses</option>
             {STATUS_OPTIONS.map((o) => (
@@ -231,7 +261,7 @@ export default function StaffTicketQueue() {
             className="ticket-toolbar__filter"
             aria-label="IT Priority"
             value={itPriorityFilter}
-            onChange={(e) => setItPriorityFilter(e.target.value)}
+            onChange={(e) => handleItPriorityFilterChange(e.target.value)}
           >
             <option value="">All IT Priorities</option>
             <option value="LOW">Low</option>
@@ -243,7 +273,7 @@ export default function StaffTicketQueue() {
             className="ticket-toolbar__filter"
             aria-label="Owner"
             value={ownerFilter}
-            onChange={(e) => setOwnerFilter(e.target.value as OwnerFilter)}
+            onChange={(e) => handleOwnerFilterChange(e.target.value as OwnerFilter)}
           >
             <option value="">All Owners</option>
             <option value="mine">Mine</option>

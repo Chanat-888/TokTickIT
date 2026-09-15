@@ -263,6 +263,18 @@ describe("IT Staff Ticket Queue", () => {
     expect(badItPriority.status).toBe(400);
   });
 
+  // PR #51 review: an unrecognized ownerId must 400 like the other filters,
+  // not silently fall through to an unfiltered queue.
+  it("An ownerId that is neither \"unassigned\" nor an integer returns 400", async () => {
+    const { staff } = await seedFixtures();
+
+    const res = await request(app)
+      .get("/api/staff/tickets?ownerId=not-a-real-id")
+      .set("Cookie", await sessionCookieFor(staff.id));
+
+    expect(res.status).toBe(400);
+  });
+
   // API-27
   it("pageSize=999 clamps to 50; pageSize=15 (not an allowed size) returns 400", async () => {
     const { staff } = await seedFixtures();

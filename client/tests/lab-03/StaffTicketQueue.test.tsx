@@ -182,4 +182,65 @@ describe("StaffTicketQueue", () => {
       expect(calls.some((u) => u.includes("/api/staff/tickets") && u.includes("ownerId=unassigned"))).toBe(true);
     });
   });
+
+  // PR #51 review: a filter change while on page 2+ must issue a single
+  // request already on page 1, not one with the stale page followed by a
+  // second reset request.
+  it("changing a filter while on page 2+ issues exactly one request, already on page 1", async () => {
+    const { fetchMock } = setupFetch({
+      queueResponder: () => jsonResponse(makeResult({ totalCount: 25, totalPages: 3 })),
+    });
+    renderScreen();
+
+    await screen.findAllByText("TKT-2026-000001");
+
+    await userEvent.click(screen.getByRole("button", { name: "2" }));
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls.map(([url]) => String(url));
+      expect(calls.some((u) => u.includes("/api/staff/tickets") && u.includes("page=2"))).toBe(true);
+    });
+
+    const queueCalls = () => fetchMock.mock.calls.map(([url]) => String(url)).filter((u) => u.includes("/api/staff/tickets"));
+    const before = queueCalls().length;
+
+    await userEvent.selectOptions(screen.getByLabelText("Status"), "OPEN");
+
+    await waitFor(() => {
+      const calls = queueCalls();
+      const last = calls[calls.length - 1] ?? "";
+      expect(last).toContain("status=OPEN");
+      expect(last).toContain("page=1");
+    });
+
+    expect(queueCalls().length - before).toBe(1);
+  });
+
+  // PR #51 review: a response for a superseded request must not overwrite
+  // the result of a request triggered after it, even if it resolves later.
+  it("ignores a stale response that resolves after a newer request already landed", async () => {
+    const resolvers: ((res: Response) => void)[] = [];
+    setupFetch({
+      queueResponder: () =>
+        new Promise<Response>((resolve) => {
+          resolvers.push(resolve);
+        }),
+    });
+    renderScreen();
+
+    await waitFor(() => expect(resolvers.length).toBeGreaterThanOrEqual(1));
+
+    await userEvent.selectOptions(screen.getByLabelText("Status"), "OPEN");
+    await waitFor(() => expect(resolvers.length).toBeGreaterThanOrEqual(2));
+
+    // Newer (second) request resolves first.
+    resolvers[1]!(jsonResponse(makeResult({ data: [{ ...baseTicket, id: 2, ticketNumber: "TKT-2026-000002" }] })));
+    await screen.findAllByText("TKT-2026-000002");
+
+    // Older (first) request resolves after — must be discarded, not shown.
+    resolvers[0]!(jsonResponse(makeResult({ data: [{ ...baseTicket, id: 1, ticketNumber: "TKT-2026-000001" }] })));
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(screen.queryByText("TKT-2026-000001")).not.toBeInTheDocument();
+    expect(screen.getAllByText("TKT-2026-000002").length).toBeGreaterThan(0);
+  });
 });
