@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import bcrypt from "bcrypt";
 import { getPrisma } from "../src/prisma.js";
 
 // Issue 3 — seed the four supported categories.
@@ -22,6 +23,11 @@ const RELATED_SYSTEM_NAMES = [
   "Printer Fleet",
 ];
 
+// docs/lab-03/specification.md §11.9 — every seeded account shares this
+// local-dev-only initial password (mustChangePassword forces a real change
+// at first login). Never a real secret; documented again in README.
+const SEED_PASSWORD = "ChangeMe123!";
+
 // Four active Requesters is the spec §7 minimum. The ~25/~5/0 ticket split
 // is defined over three of them (Alex, Sam, Priya), so Dana is the fourth
 // active Requester and holds no tickets. Priya is the one AC-13 uses for the
@@ -34,12 +40,40 @@ const REQUESTERS = [
   { name: "Chris Boonmee", email: "chris.boonmee@example.com", isActive: false },
 ];
 
+// docs/lab-03/specification.md §7 — 3+ active IT Staff, 1 inactive.
+const IT_STAFF = [
+  { name: "Jordan Blake", email: "jordan.blake@example.com", isActive: true },
+  { name: "Morgan Silva", email: "morgan.silva@example.com", isActive: true },
+  { name: "Taylor Chen", email: "taylor.chen@example.com", isActive: true },
+  { name: "Casey Novak", email: "casey.novak@example.com", isActive: false },
+];
+
+// docs/lab-03/specification.md §7 — 1+ active Administrator.
+const ADMINISTRATORS = [{ name: "Robin Park", email: "robin.park@example.com", isActive: true }];
+
 const PRIORITIES = ["LOW", "MEDIUM", "HIGH"] as const;
+
+// Non-NEW statuses cycled across a subset of Tickets so the IT Staff Queue
+// has a realistic status mix to filter/sort against (specification.md §7).
+const ASSIGNED_STATUSES = [
+  "OPEN",
+  "IN_PROGRESS",
+  "WAITING_FOR_REQUESTER",
+  "RESOLVED",
+  "CLOSED",
+  "REOPENED",
+  "CANCELLED",
+] as const;
+
+function bumpPriority(p: (typeof PRIORITIES)[number]): (typeof PRIORITIES)[number] {
+  return p === "LOW" ? "MEDIUM" : p === "MEDIUM" ? "HIGH" : "HIGH";
+}
 
 async function main() {
   const prisma = getPrisma();
   const year = new Date().getFullYear();
   const base = new Date(`${year}-01-15T09:00:00Z`);
+  const passwordHash = await bcrypt.hash(SEED_PASSWORD, 12);
 
   // upsert() keys on the unique `name`, so re-running the seed updates the
   // existing row instead of inserting a duplicate.
@@ -75,23 +109,41 @@ async function main() {
 
   // Sequential for the same reason as categories: deterministic id order.
   for (const requester of REQUESTERS) {
-    await prisma.requesterUser.upsert({
+    await prisma.user.upsert({
       where: { email: requester.email },
       update: {},
-      create: requester,
+      create: { ...requester, passwordHash, role: "REQUESTER", mustChangePassword: true },
+    });
+  }
+  for (const staff of IT_STAFF) {
+    await prisma.user.upsert({
+      where: { email: staff.email },
+      update: {},
+      create: { ...staff, passwordHash, role: "IT_STAFF", mustChangePassword: true },
+    });
+  }
+  for (const admin of ADMINISTRATORS) {
+    await prisma.user.upsert({
+      where: { email: admin.email },
+      update: {},
+      create: { ...admin, passwordHash, role: "ADMINISTRATOR", mustChangePassword: true },
     });
   }
 
-  const requesters = await prisma.requesterUser.findMany({ orderBy: { id: "asc" } });
-  console.log(`Seed complete — ${requesters.length} requester users:`);
-  for (const r of requesters) console.log(`  ${r.id}  ${r.name}  (active: ${r.isActive})`);
+  const users = await prisma.user.findMany({ orderBy: { id: "asc" } });
+  console.log(`Seed complete — ${users.length} users:`);
+  for (const u of users) console.log(`  ${u.id}  ${u.name}  ${u.role}  (active: ${u.isActive})`);
 
+  const requesters = users.filter((u) => u.role === "REQUESTER");
   const alex = requesters.find((r) => r.name === "Alex Rivera")!;
   const sam = requesters.find((r) => r.name === "Sam Okafor")!;
   const priya = requesters.find((r) => r.name === "Priya Nair")!;
+  const activeStaff = users.filter((u) => (u.role === "IT_STAFF" || u.role === "ADMINISTRATOR") && u.isActive);
 
   // 25 tickets for Alex, 5 for Sam, 0 for Priya — ticket numbers 1..30 in
-  // creation order across all requesters, per specification.md §7.
+  // creation order across all requesters, per specification.md §7. Counts
+  // per Requester are unchanged from Lab 2 — e2e/lab-02/requester-ticket-flow
+  // depends on Alex's count being exactly 25.
   const ticketPlan: { requesterId: number; requesterName: string }[] = [
     ...Array.from({ length: 25 }, () => ({ requesterId: alex.id, requesterName: alex.name })),
     ...Array.from({ length: 5 }, () => ({ requesterId: sam.id, requesterName: sam.name })),
@@ -108,7 +160,17 @@ async function main() {
     const relatedSystem = relatedSystems[i % relatedSystems.length];
     const requestedPriority = PRIORITIES[i % PRIORITIES.length];
 
-    await prisma.ticket.upsert({
+    // Roughly a quarter of tickets are claimed by IT Staff/Admin and moved
+    // off New, with IT Priority sometimes changed from Requested Priority —
+    // gives the IT Staff Queue non-trivial data to filter/sort/paginate
+    // (specification.md §7). The rest stay New/unassigned, matching Lab 2's
+    // original all-New seed so its e2e assumptions are undisturbed.
+    const isAssigned = i % 4 === 1;
+    const owner = isAssigned ? activeStaff[Math.floor(i / 4) % activeStaff.length] : null;
+    const status = isAssigned ? ASSIGNED_STATUSES[Math.floor(i / 4) % ASSIGNED_STATUSES.length] : "NEW";
+    const itPriority = i % 5 === 0 ? bumpPriority(requestedPriority) : requestedPriority;
+
+    const ticket = await prisma.ticket.upsert({
       where: { ticketNumber },
       update: {},
       create: {
@@ -119,13 +181,41 @@ async function main() {
         summary: `Seed ticket ${seq} for ${requesterName}`,
         description: `Auto-generated seed ticket ${seq} for ${requesterName}, used to exercise search, filter, sort, and pagination in My Tickets.`,
         requestedPriority,
-        status: "NEW",
+        itPriority,
+        status,
+        ownerId: owner?.id ?? null,
         idempotencyKey: randomUUID(),
         createdAt: new Date(base.getTime() + i * 29 * 60 * 60 * 1000),
       },
     });
 
     ticketCounts[requesterName] += 1;
+
+    // A handful of example Public Comments and Internal Notes on the
+    // assigned tickets (specification.md §7) — no sensitive content.
+    if (isAssigned && owner) {
+      const commentExists = await prisma.publicComment.findFirst({ where: { ticketId: ticket.id } });
+      if (!commentExists) {
+        await prisma.publicComment.create({
+          data: {
+            ticketId: ticket.id,
+            authorId: owner.id,
+            body: "Thanks for the report — looking into this now.",
+          },
+        });
+      }
+
+      const noteExists = await prisma.internalNote.findFirst({ where: { ticketId: ticket.id } });
+      if (!noteExists) {
+        await prisma.internalNote.create({
+          data: {
+            ticketId: ticket.id,
+            authorId: owner.id,
+            body: "Checked known-issues list — nothing matching yet, escalate if unresolved by EOD.",
+          },
+        });
+      }
+    }
   }
 
   const actualCount = await prisma.ticket.count();
@@ -143,6 +233,8 @@ async function main() {
   for (const [name, count] of Object.entries(ticketCounts)) {
     console.log(`  ${name}: ${count}`);
   }
+  console.log(`\nAll seeded accounts share the local-dev-only password: ${SEED_PASSWORD}`);
+  console.log("Every account requires a password change at first login (mustChangePassword).");
 }
 
 main()

@@ -17,7 +17,7 @@ const { UPLOADS_DIR } = await import("../../src/uploads.js");
 
 async function truncateAll() {
   await getPrisma().$executeRawUnsafe(
-    `TRUNCATE TABLE "Attachment", "Ticket", "RequesterUser", "RelatedSystem", "Category" RESTART IDENTITY CASCADE;`,
+    `TRUNCATE TABLE "Attachment", "Ticket", "User", "RelatedSystem", "Category" RESTART IDENTITY CASCADE;`,
   );
 }
 
@@ -30,7 +30,9 @@ async function seedRelatedSystem(name: string, isActive = true) {
 }
 
 async function seedRequester(name: string, email: string, isActive = true) {
-  return getPrisma().requesterUser.create({ data: { name, email, isActive } });
+  return getPrisma().user.create({
+    data: { name, email, isActive, passwordHash: "unused-in-lab2-tests", role: "REQUESTER" },
+  });
 }
 
 async function seedTicket(params: {
@@ -47,6 +49,7 @@ async function seedTicket(params: {
       summary: "Laptop won't power on after firmware update",
       description: "Default description long enough for validation purposes.",
       requestedPriority: "HIGH",
+      itPriority: "HIGH",
       status: "NEW",
       idempotencyKey: randomUUID(),
     },
