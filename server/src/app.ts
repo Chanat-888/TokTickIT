@@ -5,7 +5,7 @@ import multer from "multer";
 import path from "node:path";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
-import { Prisma, type Ticket, type Attachment } from "@prisma/client";
+import { Prisma, type Ticket, type Attachment, type PublicComment, type User } from "@prisma/client";
 import { getPrisma } from "./prisma.js";
 import { generateTicketNumber } from "./ticketNumber.js";
 import { validateTicketInput } from "./ticketValidation.js";
@@ -52,6 +52,14 @@ const SESSION_COOKIE_OPTIONS = {
 // /auth/change-password get requireAuth alone, since those three must stay
 // reachable while mustChangePassword is still true.
 const requireRequester = [requireAuth, requirePasswordChanged, requireRole("REQUESTER")];
+// docs/lab-03/api-spec.md §2 — Public Comment endpoints are reachable by
+// every role (Requester owner, IT Staff, Administrator); ownership is
+// enforced separately in-handler only for a Requester caller.
+const requireAnyRole = [
+  requireAuth,
+  requirePasswordChanged,
+  requireRole("REQUESTER", "IT_STAFF", "ADMINISTRATOR"),
+];
 
 // ---------------------------------------------------------------------------
 // Issue 2 — API health check
@@ -205,8 +213,27 @@ function ticketToJSON(t: Ticket) {
     description: t.description,
     requestedPriority: t.requestedPriority,
     status: t.status,
+    // api-spec.md §0.4 — the only field the Requester-facing shape gains in
+    // Lab 3; ownerId internals stay off this representation (§0.4).
+    requesterIndicatedResolvedAt: t.requesterIndicatedResolvedAt
+      ? t.requesterIndicatedResolvedAt.toISOString()
+      : null,
     createdAt: t.createdAt.toISOString(),
     updatedAt: t.updatedAt.toISOString(),
+  };
+}
+
+// api-spec.md §0.4 — shared representation for PublicComment and
+// InternalNote rows.
+function commentToJSON(c: PublicComment & { author: User }) {
+  return {
+    id: c.id,
+    ticketId: c.ticketId,
+    authorId: c.authorId,
+    authorName: c.author.name,
+    authorRole: c.author.role,
+    body: c.body,
+    createdAt: c.createdAt.toISOString(),
   };
 }
 
@@ -821,6 +848,116 @@ app.delete(
         `DELETE /api/tickets/${req.params.ticketId}/attachments/${req.params.attachmentId} failed:`,
         err,
       );
+      res.status(500).json({ error: "Unexpected server error" });
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Issue 39 — Public Comments and "Problem Appears Resolved"
+// (docs/lab-03/api-spec.md §2)
+// ---------------------------------------------------------------------------
+
+// Shared by POST/GET .../comments: resolves the Ticket and, for a
+// Requester caller only, enforces ownership (BR-03) — IT Staff and
+// Administrator may act on any Ticket (FR-14).
+async function findAccessibleTicket(idParam: string, user: User): Promise<Ticket | null> {
+  if (!/^\d+$/.test(idParam)) return null;
+  const ticket = await getPrisma().ticket.findUnique({ where: { id: Number(idParam) } });
+  if (!ticket) return null;
+  if (user.role === "REQUESTER" && ticket.requesterId !== user.id) return null;
+  return ticket;
+}
+
+// BR-21: empty/whitespace-only (after trimming) or over 2000 raw characters.
+function commentBodyError(raw: unknown): string | null {
+  if (typeof raw !== "string" || raw.trim().length === 0) {
+    return "Comment cannot be empty";
+  }
+  if (raw.length > 2000) {
+    return "Comment must be 2000 characters or fewer";
+  }
+  return null;
+}
+
+app.post("/api/tickets/:id/comments", requireAnyRole, async (req: Request, res: Response) => {
+  try {
+    const ticket = await findAccessibleTicket(req.params.id, req.user!);
+    if (!ticket) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    // BR-22: authorId always comes from the session; any client-supplied
+    // authorId in the body is ignored.
+    const body = (req.body ?? {}) as { body?: unknown };
+    const error = commentBodyError(body.body);
+    if (error) {
+      return res.status(400).json({ errors: [{ field: "body", message: error }] });
+    }
+
+    const created = await getPrisma().publicComment.create({
+      data: { ticketId: ticket.id, authorId: req.user!.id, body: body.body as string },
+      include: { author: true },
+    });
+
+    return res.status(201).json(commentToJSON(created));
+  } catch (err) {
+    console.error(`POST /api/tickets/${req.params.id}/comments failed:`, err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
+app.get("/api/tickets/:id/comments", requireAnyRole, async (req: Request, res: Response) => {
+  try {
+    const ticket = await findAccessibleTicket(req.params.id, req.user!);
+    if (!ticket) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const comments = await getPrisma().publicComment.findMany({
+      where: { ticketId: ticket.id },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      include: { author: true },
+    });
+
+    return res.status(200).json({ data: comments.map(commentToJSON) });
+  } catch (err) {
+    console.error(`GET /api/tickets/${req.params.id}/comments failed:`, err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
+// BR-24/AC-11: records a flag/timestamp without changing Status; a
+// Closed/Cancelled Ticket has nothing actionable left for the Requester, so
+// it 404s the same as a nonexistent or unowned Ticket rather than leaking
+// terminal-state detail (api-spec.md §2).
+app.post(
+  "/api/tickets/:id/resolve-indication",
+  requireRequester,
+  async (req: Request, res: Response) => {
+    try {
+      const requesterId = req.user!.id;
+      if (!/^\d+$/.test(req.params.id)) {
+        return res.status(404).json({ error: "Not found" });
+      }
+      const ticket = await getPrisma().ticket.findUnique({ where: { id: Number(req.params.id) } });
+      if (
+        !ticket ||
+        ticket.requesterId !== requesterId ||
+        ticket.status === "CLOSED" ||
+        ticket.status === "CANCELLED"
+      ) {
+        return res.status(404).json({ error: "Not found" });
+      }
+
+      const updated = await getPrisma().ticket.update({
+        where: { id: ticket.id },
+        data: { requesterIndicatedResolvedAt: new Date() },
+      });
+
+      return res.status(200).json(ticketToJSON(updated));
+    } catch (err) {
+      console.error(`POST /api/tickets/${req.params.id}/resolve-indication failed:`, err);
       res.status(500).json({ error: "Unexpected server error" });
     }
   },

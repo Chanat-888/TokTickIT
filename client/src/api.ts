@@ -50,6 +50,9 @@ export interface Ticket {
   description: string;
   requestedPriority: Priority;
   status: TicketStatus;
+  // docs/lab-03/api-spec.md §0.4 — the only field the Requester-facing
+  // shape gains in Lab 3.
+  requesterIndicatedResolvedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -326,4 +329,57 @@ export async function removeAttachment(
     throw new Error(`Attachment removal failed with status ${res.status}`);
   }
   return (await res.json()) as Attachment;
+}
+
+// api-spec.md §0.4 — shared shape for PublicComment and InternalNote rows.
+export interface Comment {
+  id: number;
+  ticketId: number;
+  authorId: number;
+  authorName: string;
+  authorRole: Role;
+  body: string;
+  createdAt: string;
+}
+
+// Issue 39 — Public Comments on Ticket Detail (api-spec.md §2, FR-07).
+export async function getComments(ticketId: number): Promise<Comment[]> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/comments`);
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  if (!res.ok) {
+    throw new Error(`Comments fetch failed with status ${res.status}`);
+  }
+  const body = (await res.json()) as { data: Comment[] };
+  return body.data;
+}
+
+export async function postComment(ticketId: number, body: string): Promise<Comment> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/comments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ body }),
+  });
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  if (!res.ok) {
+    throw new Error(`Post comment failed with status ${res.status}`);
+  }
+  return (await res.json()) as Comment;
+}
+
+// Issue 39 — "Problem Appears Resolved" (api-spec.md §2, FR-08, BR-24).
+export async function resolveIndication(ticketId: number): Promise<Ticket> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/resolve-indication`, {
+    method: "POST",
+  });
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  if (!res.ok) {
+    throw new Error(`Resolve indication failed with status ${res.status}`);
+  }
+  return (await res.json()) as Ticket;
 }
