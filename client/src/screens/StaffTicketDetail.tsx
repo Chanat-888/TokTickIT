@@ -273,8 +273,12 @@ export default function StaffTicketDetail() {
     setOwnerSaving(true);
     setOwnerError(null);
     try {
-      const updated = await setTicketOwner(ticket.id, user.id);
-      setTicket((prev) => (prev ? { ...prev, ownerId: updated.ownerId } : prev));
+      await setTicketOwner(ticket.id, user.id);
+      // Re-fetch rather than merge just the changed field: another staff
+      // member's edit made since page load (e.g. a concurrent status
+      // change) would otherwise stay stale on screen after this partial
+      // update (PR #52 review).
+      load();
     } catch {
       setOwnerError("Couldn't claim this Ticket. Please try again.");
     } finally {
@@ -287,8 +291,8 @@ export default function StaffTicketDetail() {
     setOwnerSaving(true);
     setOwnerError(null);
     try {
-      const updated = await setTicketOwner(ticket.id, newOwnerId);
-      setTicket((prev) => (prev ? { ...prev, ownerId: updated.ownerId } : prev));
+      await setTicketOwner(ticket.id, newOwnerId);
+      load();
     } catch {
       setOwnerError("Couldn't reassign this Ticket. Please try again.");
     } finally {
@@ -301,8 +305,8 @@ export default function StaffTicketDetail() {
     setItPrioritySaving(true);
     setItPriorityError(null);
     try {
-      const updated = await setTicketItPriority(ticket.id, value);
-      setTicket((prev) => (prev ? { ...prev, itPriority: updated.itPriority } : prev));
+      await setTicketItPriority(ticket.id, value);
+      load();
     } catch {
       setItPriorityError("Couldn't update IT Priority. Please try again.");
     } finally {
@@ -315,8 +319,8 @@ export default function StaffTicketDetail() {
     setStatusSaving(true);
     setStatusError(null);
     try {
-      const updated = await setTicketStatus(ticket.id, status);
-      setTicket((prev) => (prev ? { ...prev, status: updated.status } : prev));
+      await setTicketStatus(ticket.id, status);
+      load();
     } catch (err) {
       setStatusError(
         err instanceof StatusTransitionError

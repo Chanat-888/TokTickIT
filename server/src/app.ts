@@ -1313,10 +1313,21 @@ app.patch("/api/staff/tickets/:id/status", requireStaff, async (req: Request, re
       return res.status(409).json({ error: "Status transition not permitted" });
     }
 
-    const updated = await getPrisma().ticket.update({
-      where: { id: ticket.id },
+    // Guards against two staff acting concurrently: without the status
+    // condition here, both could read the same old status, both pass the
+    // matrix check above, and the second plain update() would silently
+    // overwrite the first. updateMany's where clause makes the write
+    // conditional on the status still being what we validated against; a
+    // count of 0 means it changed underneath us since the read above.
+    const updateResult = await getPrisma().ticket.updateMany({
+      where: { id: ticket.id, status: ticket.status },
       data: { status: body.status as Ticket["status"] },
     });
+    if (updateResult.count === 0) {
+      return res.status(409).json({ error: "Status transition not permitted" });
+    }
+
+    const updated = await getPrisma().ticket.findUniqueOrThrow({ where: { id: ticket.id } });
     return res.status(200).json(staffTicketToJSON(updated));
   } catch (err) {
     console.error(`PATCH /api/staff/tickets/${req.params.id}/status failed:`, err);
