@@ -783,3 +783,73 @@ textarea.field__control {
   border-radius: var(--radius-control);
   background: var(--color-page-bg);
 }
+
+.ticket-detail__resolve-indication {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xs);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Public Comments — docs/lab-03/ui-spec.md §3, §19                       */
+/* ---------------------------------------------------------------------- */
+
+.comment-panel {
+  padding: var(--space-xl);
+  border-radius: var(--radius-control);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.comment-panel--public {
+  background: var(--color-pale-green);
+  border: 1px solid var(--color-secondary-green);
+}
+
+.comment-panel__header {
+  margin: 0;
+  font-weight: 600;
+}
+
+.comment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.comment-entry {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.comment-entry__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+
+.comment-entry__author {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.comment-entry__body {
+  margin: var(--space-xs) 0 0;
+  white-space: pre-wrap;
+}
+
+.comment-compose {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  align-items: flex-start;
+}

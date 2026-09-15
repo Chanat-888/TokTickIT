@@ -13,13 +13,17 @@ import {
   downloadAttachmentUrl,
   getAttachment,
   getCategories,
+  getComments,
   getRelatedSystems,
   getTicket,
+  postComment,
   removeAttachment,
+  resolveIndication,
   uploadAttachments,
   NotFoundError,
   type Attachment,
   type Category,
+  type Comment,
   type RelatedSystem,
   type TicketDetail as TicketDetailData,
 } from "../api.js";
@@ -33,6 +37,17 @@ type LoadState = "loading" | "loaded" | "not-found" | "error";
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
+
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString();
+}
+
+// ui-spec.md §5.3 — the same Role label used by the app shell's Role badge.
+const ROLE_LABEL: Record<string, string> = {
+  REQUESTER: "Requester",
+  IT_STAFF: "IT Staff",
+  ADMINISTRATOR: "Administrator",
+};
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -232,6 +247,85 @@ function AttachmentRow({
   );
 }
 
+// ui-spec.md §3 — the Requester's Ticket Detail only ever shows this one
+// panel; there is no Internal Notes tab in the Requester's UI at all.
+function PublicCommentsPanel({
+  state,
+  comments,
+  draft,
+  onDraftChange,
+  posting,
+  postError,
+  onPost,
+}: {
+  state: "loading" | "loaded" | "error";
+  comments: Comment[];
+  draft: string;
+  onDraftChange: (value: string) => void;
+  posting: boolean;
+  postError: string | null;
+  onPost: () => void;
+}) {
+  return (
+    <section className="ticket-detail__comments">
+      <h2>Public Comments</h2>
+      <div className="comment-panel comment-panel--public">
+        <p className="comment-panel__header">Public Comments — visible to the Requester</p>
+
+        {state === "loading" && <p>Loading comments…</p>}
+        {state === "error" && (
+          <p className="field__message field__message--error">Couldn't load comments.</p>
+        )}
+        {state === "loaded" && (
+          <>
+            {comments.length === 0 ? (
+              <p>No comments yet.</p>
+            ) : (
+              <ul className="comment-list">
+                {comments.map((c) => (
+                  <li key={c.id} className="comment-entry">
+                    <div className="comment-entry__meta">
+                      <span className="comment-entry__author">{c.authorName}</span>
+                      <span className="role-badge">{ROLE_LABEL[c.authorRole]}</span>
+                      <span className="comment-entry__timestamp">{formatDateTime(c.createdAt)}</span>
+                    </div>
+                    <p className="comment-entry__body">{c.body}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+
+        <div className="comment-compose">
+          <label className="field__label" htmlFor="comment-body">
+            Add a comment
+          </label>
+          <textarea
+            id="comment-body"
+            className="field__control"
+            value={draft}
+            maxLength={2000}
+            onChange={(e) => onDraftChange(e.target.value)}
+          />
+          <p className="field__message">{draft.length}/2000</p>
+          {postError && <p className="field__message field__message--error">{postError}</p>}
+          <button
+            type="button"
+            className={`btn btn--secondary${posting ? " btn--busy" : ""}`}
+            disabled={posting || draft.trim().length === 0}
+            aria-busy={posting}
+            onClick={onPost}
+          >
+            {posting && <span className="btn__spinner" aria-hidden="true" />}
+            {posting ? "Posting…" : "Post"}
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function TicketDetail() {
   const { id } = useParams<{ id: string }>();
 
@@ -257,6 +351,29 @@ export default function TicketDetail() {
   const [pickerFiles, setPickerFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // ui-spec.md §3, §5.4 — Public Comments panel.
+  const [commentsState, setCommentsState] = useState<"loading" | "loaded" | "error">("loading");
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [commentDraft, setCommentDraft] = useState("");
+  const [postingComment, setPostingComment] = useState(false);
+  const [postCommentError, setPostCommentError] = useState<string | null>(null);
+
+  // ui-spec.md §5.4 — "Problem Appears Resolved".
+  const [resolving, setResolving] = useState(false);
+  const [resolveError, setResolveError] = useState<string | null>(null);
+
+  const loadComments = useCallback(() => {
+    setCommentsState("loading");
+    getComments(Number(id))
+      .then((data) => {
+        setComments(data);
+        setCommentsState("loaded");
+      })
+      .catch(() => {
+        setCommentsState("error");
+      });
+  }, [id]);
 
   useEffect(() => {
     getCategories()
@@ -286,6 +403,43 @@ export default function TicketDetail() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    loadComments();
+  }, [loadComments]);
+
+  async function handlePostComment() {
+    if (!ticket || commentDraft.trim().length === 0) return;
+    setPostingComment(true);
+    setPostCommentError(null);
+    try {
+      const created = await postComment(ticket.id, commentDraft);
+      setComments((prev) => [...prev, created]);
+      setCommentDraft("");
+    } catch {
+      setPostCommentError("Couldn't post comment. Please try again.");
+    } finally {
+      setPostingComment(false);
+    }
+  }
+
+  // ui-spec.md §5.4 — records the flag, then swaps the button for the
+  // disabled/checked timestamp state (BR-24).
+  async function handleResolveIndication() {
+    if (!ticket) return;
+    setResolving(true);
+    setResolveError(null);
+    try {
+      const updated = await resolveIndication(ticket.id);
+      setTicket((prev) =>
+        prev ? { ...prev, requesterIndicatedResolvedAt: updated.requesterIndicatedResolvedAt } : prev,
+      );
+    } catch {
+      setResolveError("Couldn't record this. Please try again.");
+    } finally {
+      setResolving(false);
+    }
+  }
 
   function categoryName(categoryId: number): string {
     return categories.find((c) => c.id === categoryId)?.name ?? String(categoryId);
@@ -539,6 +693,38 @@ export default function TicketDetail() {
               </ul>
             )}
           </section>
+
+          {ticket.status !== "CLOSED" && ticket.status !== "CANCELLED" && (
+            <section className="ticket-detail__resolve-indication">
+              {ticket.requesterIndicatedResolvedAt ? (
+                <button type="button" className="btn btn--secondary" disabled aria-disabled="true">
+                  ✓ Problem appears resolved — recorded {formatDateTime(ticket.requesterIndicatedResolvedAt)}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={`btn btn--secondary${resolving ? " btn--busy" : ""}`}
+                  disabled={resolving}
+                  aria-busy={resolving}
+                  onClick={handleResolveIndication}
+                >
+                  {resolving && <span className="btn__spinner" aria-hidden="true" />}
+                  {resolving ? "Recording…" : "Problem Appears Resolved"}
+                </button>
+              )}
+              {resolveError && <p className="field__message field__message--error">{resolveError}</p>}
+            </section>
+          )}
+
+          <PublicCommentsPanel
+            state={commentsState}
+            comments={comments}
+            draft={commentDraft}
+            onDraftChange={setCommentDraft}
+            posting={postingComment}
+            postError={postCommentError}
+            onPost={handlePostComment}
+          />
         </>
       )}
     </div>
