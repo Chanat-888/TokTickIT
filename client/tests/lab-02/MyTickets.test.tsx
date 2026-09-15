@@ -3,7 +3,6 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import MyTickets from "../../src/screens/MyTickets.js";
-import { RequesterProvider, setSelectedRequester } from "../../src/lib/requesterContext.js";
 
 const baseTicket = {
   id: 1,
@@ -66,17 +65,14 @@ function setupFetch(
 }
 
 function renderScreen() {
-  setSelectedRequester({ id: 1, name: "Alex Rivera" });
   return render(
-    <RequesterProvider>
-      <MemoryRouter initialEntries={["/tickets"]}>
-        <Routes>
-          <Route path="/tickets" element={<MyTickets />} />
-          <Route path="/tickets/new" element={<h1>Create Ticket</h1>} />
-          <Route path="/tickets/:id" element={<h1>Ticket Detail</h1>} />
-        </Routes>
-      </MemoryRouter>
-    </RequesterProvider>,
+    <MemoryRouter initialEntries={["/tickets"]}>
+      <Routes>
+        <Route path="/tickets" element={<MyTickets />} />
+        <Route path="/tickets/new" element={<h1>Create Ticket</h1>} />
+        <Route path="/tickets/:id" element={<h1>Ticket Detail</h1>} />
+      </Routes>
+    </MemoryRouter>,
   );
 }
 

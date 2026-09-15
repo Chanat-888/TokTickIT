@@ -1,5 +1,4 @@
 import { API_URL, apiFetch } from "./lib/apiClient.js";
-import { getSelectedRequester } from "./lib/requesterContext.js";
 
 export interface Category {
   id: number;
@@ -11,12 +10,34 @@ export interface RelatedSystem {
   name: string;
 }
 
-export interface Requester {
+export type Priority = "LOW" | "MEDIUM" | "HIGH";
+
+// docs/lab-03/specification.md §5 "Status transition matrix" — the full set
+// a Ticket can now reach; Requester-facing screens must be able to render
+// any of these even though only IT Staff/Administrator can set them.
+export type TicketStatus =
+  | "NEW"
+  | "OPEN"
+  | "IN_PROGRESS"
+  | "WAITING_FOR_REQUESTER"
+  | "RESOLVED"
+  | "CLOSED"
+  | "REOPENED"
+  | "CANCELLED";
+
+// docs/lab-03/api-spec.md §0.4 — never includes passwordHash or a session
+// token.
+export type Role = "REQUESTER" | "IT_STAFF" | "ADMINISTRATOR";
+export interface User {
   id: number;
   name: string;
+  email: string;
+  role: Role;
+  isActive: boolean;
+  mustChangePassword: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
-
-export type Priority = "LOW" | "MEDIUM" | "HIGH";
 
 // api-spec.md §0.3 — the shared Ticket representation.
 export interface Ticket {
@@ -28,7 +49,7 @@ export interface Ticket {
   summary: string;
   description: string;
   requestedPriority: Priority;
-  status: "NEW";
+  status: TicketStatus;
   createdAt: string;
   updatedAt: string;
 }
@@ -59,21 +80,70 @@ export interface CreateTicketInput {
   requestedPriority: Priority;
 }
 
-// Issue 17 — active Development Requesters, for the Requester Selection
-// screen. No X-Requester-Id header required (api-spec.md §0.1): this is the
-// endpoint that runs before a Requester is chosen, so it deliberately uses a
-// plain fetch rather than the apiClient wrapper.
-// The timeout covers the case where the backend accepts the connection but
-// never responds — without it the screen would stay on "Loading Requesters…"
-// forever.
-export async function getRequesters(): Promise<Requester[]> {
-  const res = await fetch(`${API_URL}/api/requesters`, {
-    signal: AbortSignal.timeout(5000),
+// docs/lab-03/api-spec.md §1 — Authentication. Login uses a plain fetch
+// (not apiFetch) since there is no session yet to attach; credentials:
+// "include" still matters here so the Set-Cookie response is honored.
+export type LoginResult =
+  | { status: 200; user: User }
+  | { status: 401 | 403; error: string }
+  | { status: 400; errors: FieldError[] };
+
+export async function login(email: string, password: string): Promise<LoginResult> {
+  const res = await fetch(`${API_URL}/auth/login`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
   });
-  if (!res.ok) {
-    throw new Error(`Requesters fetch failed with status ${res.status}`);
+  if (res.status === 200) {
+    return { status: 200, user: (await res.json()) as User };
   }
-  return (await res.json()) as Requester[];
+  if (res.status === 400) {
+    const body = (await res.json()) as { errors: FieldError[] };
+    return { status: 400, errors: body.errors };
+  }
+  const body = (await res.json()) as { error: string };
+  return { status: res.status as 401 | 403, error: body.error };
+}
+
+export async function logout(): Promise<void> {
+  await apiFetch("/auth/logout", { method: "POST" });
+}
+
+// Returns null on 401 (not authenticated) rather than throwing — this is
+// the normal "am I logged in?" check on app boot, not an error condition.
+export async function getMe(): Promise<User | null> {
+  const res = await apiFetch("/auth/me");
+  if (res.status === 401) return null;
+  if (!res.ok) {
+    throw new Error(`GET /auth/me failed with status ${res.status}`);
+  }
+  return (await res.json()) as User;
+}
+
+export type ChangePasswordResult =
+  | { status: 200; user: User }
+  | { status: 401; error: string }
+  | { status: 400; errors: FieldError[] };
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<ChangePasswordResult> {
+  const res = await apiFetch("/auth/change-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  if (res.status === 200) {
+    return { status: 200, user: (await res.json()) as User };
+  }
+  if (res.status === 400) {
+    const body = (await res.json()) as { errors: FieldError[] };
+    return { status: 400, errors: body.errors };
+  }
+  const body = (await res.json()) as { error: string };
+  return { status: 401, error: body.error };
 }
 
 // Issue 18 — active Categories, for the Create Ticket category dropdown. No
@@ -227,15 +297,11 @@ export async function getAttachment(ticketId: number, attachmentId: number): Pro
 
 // Issue 21 — builds the absolute download URL (api-spec.md §9), used as a
 // plain <a href> so the file opens/downloads directly in the browser rather
-// than being fetched-then-blobbed (BR-35). A plain link navigation can't
-// carry the X-Requester-Id header apiFetch normally attaches, so — as a
-// deviation scoped to this one endpoint only — the requester id is appended
-// as a `requesterId` query param instead; the server route accepts either
-// (api-spec.md §9, TASK 4 of Issue #21).
+// than being fetched-then-blobbed (BR-35). The session cookie is sent
+// automatically on same-site navigation (SameSite=Lax), so — unlike Lab 2's
+// X-Requester-Id header — no id needs to be appended to the URL.
 export function downloadAttachmentUrl(ticketId: number, attachmentId: number): string {
-  const requester = getSelectedRequester();
-  const query = requester ? `?requesterId=${requester.id}` : "";
-  return `${API_URL}/api/tickets/${ticketId}/attachments/${attachmentId}/download${query}`;
+  return `${API_URL}/api/tickets/${ticketId}/attachments/${attachmentId}/download`;
 }
 
 // Issue 21 — thrown by removeAttachment on a 409, so the UI can show a

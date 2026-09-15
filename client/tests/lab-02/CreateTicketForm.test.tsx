@@ -3,7 +3,18 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import CreateTicketForm from "../../src/screens/CreateTicketForm.js";
-import { RequesterProvider, setSelectedRequester } from "../../src/lib/requesterContext.js";
+import { AuthProvider } from "../../src/lib/authContext.js";
+
+const defaultUser = {
+  id: 1,
+  name: "Alex Rivera",
+  email: "alex@example.com",
+  role: "REQUESTER",
+  isActive: true,
+  mustChangePassword: false,
+  createdAt: "2026-08-01T00:00:00.000Z",
+  updatedAt: "2026-08-01T00:00:00.000Z",
+};
 
 const defaultTicket = {
   id: 42,
@@ -47,6 +58,7 @@ function setupFetch(options: {
     const url = typeof input === "string" ? input : input.toString();
     const method = init?.method ?? "GET";
 
+    if (url.includes("/auth/me")) return jsonResponse(defaultUser);
     if (url.includes("/api/categories")) return jsonResponse(categories);
     if (url.includes("/api/related-systems")) return jsonResponse(relatedSystems);
     if (url.includes("/attachments")) {
@@ -62,9 +74,8 @@ function setupFetch(options: {
 }
 
 function renderScreen() {
-  setSelectedRequester({ id: 1, name: "Alex Rivera" });
   return render(
-    <RequesterProvider>
+    <AuthProvider>
       <MemoryRouter initialEntries={["/tickets/new"]}>
         <Routes>
           <Route path="/tickets/new" element={<CreateTicketForm />} />
@@ -72,7 +83,7 @@ function renderScreen() {
           <Route path="/tickets" element={<h1>My Tickets</h1>} />
         </Routes>
       </MemoryRouter>
-    </RequesterProvider>,
+    </AuthProvider>,
   );
 }
 

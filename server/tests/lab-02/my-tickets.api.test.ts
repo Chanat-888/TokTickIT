@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
+import { sessionCookieFor } from "../authHelpers.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const serverRoot = path.join(__dirname, "..", "..");
@@ -29,7 +30,7 @@ async function seedRelatedSystem(name: string, isActive = true) {
 
 async function seedRequester(name: string, email: string, isActive = true) {
   return getPrisma().user.create({
-    data: { name, email, isActive, passwordHash: "unused-in-lab2-tests", role: "REQUESTER" },
+    data: { name, email, isActive, passwordHash: "unused-in-lab2-tests", role: "REQUESTER", mustChangePassword: false },
   });
 }
 
@@ -82,14 +83,13 @@ describe("My Tickets", () => {
     delete process.env.DATABASE_URL;
   });
 
-  // API-16
-  it("GET /api/tickets without X-Requester-Id returns 400", async () => {
+  // API-16 (Lab 3 auth foundation superseded the header check with session
+  // auth — docs/lab-03/api-spec.md §0.1)
+  it("GET /api/tickets without a session cookie returns 401", async () => {
     const res = await request(app).get("/api/tickets");
 
-    expect(res.status).toBe(400);
-    expect(res.body.errors).toEqual([
-      { field: "X-Requester-Id", message: "Missing or invalid requester header" },
-    ]);
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: "Not authenticated" });
   });
 
   // API-17
@@ -101,8 +101,8 @@ describe("My Tickets", () => {
     await seedTicket({ requesterId: alex.id, categoryId: category.id, relatedSystemId: relatedSystem.id });
     await seedTicket({ requesterId: sam.id, categoryId: category.id, relatedSystemId: relatedSystem.id });
 
-    const alexRes = await request(app).get("/api/tickets").set("X-Requester-Id", String(alex.id));
-    const samRes = await request(app).get("/api/tickets").set("X-Requester-Id", String(sam.id));
+    const alexRes = await request(app).get("/api/tickets").set("Cookie", await sessionCookieFor(alex.id));
+    const samRes = await request(app).get("/api/tickets").set("Cookie", await sessionCookieFor(sam.id));
 
     expect(alexRes.body.data).toHaveLength(1);
     expect(alexRes.body.data[0].requesterId).toBe(alex.id);
@@ -125,7 +125,7 @@ describe("My Tickets", () => {
       });
     }
 
-    const res = await request(app).get("/api/tickets").set("X-Requester-Id", String(requester.id));
+    const res = await request(app).get("/api/tickets").set("Cookie", await sessionCookieFor(requester.id));
 
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(10);
@@ -150,8 +150,8 @@ describe("My Tickets", () => {
       });
     }
 
-    const page2 = await request(app).get("/api/tickets?page=2").set("X-Requester-Id", String(requester.id));
-    const page3 = await request(app).get("/api/tickets?page=3").set("X-Requester-Id", String(requester.id));
+    const page2 = await request(app).get("/api/tickets?page=2").set("Cookie", await sessionCookieFor(requester.id));
+    const page3 = await request(app).get("/api/tickets?page=3").set("Cookie", await sessionCookieFor(requester.id));
 
     expect(page2.body.data).toHaveLength(10);
     expect(page3.body.data).toHaveLength(5);
@@ -164,7 +164,7 @@ describe("My Tickets", () => {
     const requester = await seedRequester("Alex Rivera", "alex@example.com");
     await seedTicket({ requesterId: requester.id, categoryId: category.id, relatedSystemId: relatedSystem.id });
 
-    const res = await request(app).get("/api/tickets?page=99").set("X-Requester-Id", String(requester.id));
+    const res = await request(app).get("/api/tickets?page=99").set("Cookie", await sessionCookieFor(requester.id));
 
     expect(res.status).toBe(200);
     expect(res.body.data).toEqual([]);
@@ -177,7 +177,7 @@ describe("My Tickets", () => {
     const requester = await seedRequester("Alex Rivera", "alex@example.com");
     await seedTicket({ requesterId: requester.id, categoryId: category.id, relatedSystemId: relatedSystem.id });
 
-    const res = await request(app).get("/api/tickets?pageSize=999").set("X-Requester-Id", String(requester.id));
+    const res = await request(app).get("/api/tickets?pageSize=999").set("Cookie", await sessionCookieFor(requester.id));
 
     expect(res.status).toBe(200);
     expect(res.body.pageSize).toBe(50);
@@ -190,7 +190,7 @@ describe("My Tickets", () => {
     const requester = await seedRequester("Alex Rivera", "alex@example.com");
     await seedTicket({ requesterId: requester.id, categoryId: category.id, relatedSystemId: relatedSystem.id });
 
-    const res = await request(app).get("/api/tickets?page=0").set("X-Requester-Id", String(requester.id));
+    const res = await request(app).get("/api/tickets?page=0").set("Cookie", await sessionCookieFor(requester.id));
 
     expect(res.status).toBe(200);
     expect(res.body.page).toBe(1);
@@ -206,7 +206,7 @@ describe("My Tickets", () => {
 
     const res = await request(app)
       .get(`/api/tickets?search=${ticket.ticketNumber}`)
-      .set("X-Requester-Id", String(requester.id));
+      .set("Cookie", await sessionCookieFor(requester.id));
 
     expect(res.body.data).toHaveLength(1);
     expect(res.body.data[0].ticketNumber).toBe(ticket.ticketNumber);
@@ -230,7 +230,7 @@ describe("My Tickets", () => {
       summary: "Printer jam on floor 3",
     });
 
-    const res = await request(app).get("/api/tickets?search=POWER").set("X-Requester-Id", String(requester.id));
+    const res = await request(app).get("/api/tickets?search=POWER").set("Cookie", await sessionCookieFor(requester.id));
 
     expect(res.body.data).toHaveLength(1);
     expect(res.body.data[0].summary).toBe("Laptop won't power on");
@@ -247,7 +247,7 @@ describe("My Tickets", () => {
 
     const res = await request(app)
       .get(`/api/tickets?categoryId=${hardware.id}`)
-      .set("X-Requester-Id", String(requester.id));
+      .set("Cookie", await sessionCookieFor(requester.id));
 
     expect(res.body.data).toHaveLength(1);
     expect(res.body.data[0].categoryId).toBe(hardware.id);
@@ -273,7 +273,7 @@ describe("My Tickets", () => {
 
     const res = await request(app)
       .get("/api/tickets?requestedPriority=HIGH")
-      .set("X-Requester-Id", String(requester.id));
+      .set("Cookie", await sessionCookieFor(requester.id));
 
     expect(res.body.data).toHaveLength(1);
     expect(res.body.data[0].requestedPriority).toBe("HIGH");
@@ -283,7 +283,7 @@ describe("My Tickets", () => {
   it("returns 400 for a categoryId that references no Category row", async () => {
     const requester = await seedRequester("Alex Rivera", "alex@example.com");
 
-    const res = await request(app).get("/api/tickets?categoryId=999").set("X-Requester-Id", String(requester.id));
+    const res = await request(app).get("/api/tickets?categoryId=999").set("Cookie", await sessionCookieFor(requester.id));
 
     expect(res.status).toBe(400);
     expect(res.body.errors).toEqual(
@@ -297,13 +297,13 @@ describe("My Tickets", () => {
 
     const badSortBy = await request(app)
       .get("/api/tickets?sortBy=notAField")
-      .set("X-Requester-Id", String(requester.id));
+      .set("Cookie", await sessionCookieFor(requester.id));
     const badSortDir = await request(app)
       .get("/api/tickets?sortDir=sideways")
-      .set("X-Requester-Id", String(requester.id));
+      .set("Cookie", await sessionCookieFor(requester.id));
     const badStatus = await request(app)
       .get("/api/tickets?status=RESOLVED")
-      .set("X-Requester-Id", String(requester.id));
+      .set("Cookie", await sessionCookieFor(requester.id));
 
     expect(badSortBy.status).toBe(400);
     expect(badSortBy.body.errors).toEqual(
@@ -328,10 +328,10 @@ describe("My Tickets", () => {
 
     const desc = await request(app)
       .get("/api/tickets?sortBy=requestedPriority&sortDir=desc")
-      .set("X-Requester-Id", String(requester.id));
+      .set("Cookie", await sessionCookieFor(requester.id));
     const asc = await request(app)
       .get("/api/tickets?sortBy=requestedPriority&sortDir=asc")
-      .set("X-Requester-Id", String(requester.id));
+      .set("Cookie", await sessionCookieFor(requester.id));
 
     expect(desc.body.data.map((t: { requestedPriority: string }) => t.requestedPriority)).toEqual([
       "HIGH",
@@ -364,8 +364,8 @@ describe("My Tickets", () => {
       createdAt: sameCreatedAt,
     });
 
-    const res1 = await request(app).get("/api/tickets").set("X-Requester-Id", String(requester.id));
-    const res2 = await request(app).get("/api/tickets").set("X-Requester-Id", String(requester.id));
+    const res1 = await request(app).get("/api/tickets").set("Cookie", await sessionCookieFor(requester.id));
+    const res2 = await request(app).get("/api/tickets").set("Cookie", await sessionCookieFor(requester.id));
 
     expect(res1.body.data.map((t: { id: number }) => t.id)).toEqual([second.id, first.id]);
     expect(res2.body.data.map((t: { id: number }) => t.id)).toEqual([second.id, first.id]);
@@ -375,7 +375,7 @@ describe("My Tickets", () => {
   it("returns data: [] and totalCount: 0 for a Requester with zero Tickets", async () => {
     const requester = await seedRequester("Alex Rivera", "alex@example.com");
 
-    const res = await request(app).get("/api/tickets").set("X-Requester-Id", String(requester.id));
+    const res = await request(app).get("/api/tickets").set("Cookie", await sessionCookieFor(requester.id));
 
     expect(res.body.data).toEqual([]);
     expect(res.body.totalCount).toBe(0);
@@ -389,10 +389,10 @@ describe("My Tickets", () => {
     const requester = await seedRequester("Alex Rivera", "alex@example.com");
     await seedTicket({ requesterId: requester.id, categoryId: hardware.id, relatedSystemId: relatedSystem.id });
 
-    const unfiltered = await request(app).get("/api/tickets").set("X-Requester-Id", String(requester.id));
+    const unfiltered = await request(app).get("/api/tickets").set("Cookie", await sessionCookieFor(requester.id));
     const filtered = await request(app)
       .get(`/api/tickets?categoryId=${software.id}`)
-      .set("X-Requester-Id", String(requester.id));
+      .set("Cookie", await sessionCookieFor(requester.id));
 
     expect(unfiltered.body.data.length).toBeGreaterThan(0);
     expect(filtered.body.data).toEqual([]);

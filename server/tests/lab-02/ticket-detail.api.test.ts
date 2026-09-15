@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
+import { sessionCookieFor } from "../authHelpers.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const serverRoot = path.join(__dirname, "..", "..");
@@ -29,7 +30,7 @@ async function seedRelatedSystem(name: string, isActive = true) {
 
 async function seedRequester(name: string, email: string, isActive = true) {
   return getPrisma().user.create({
-    data: { name, email, isActive, passwordHash: "unused-in-lab2-tests", role: "REQUESTER" },
+    data: { name, email, isActive, passwordHash: "unused-in-lab2-tests", role: "REQUESTER", mustChangePassword: false },
   });
 }
 
@@ -109,7 +110,7 @@ describe("Ticket Detail", () => {
     });
     const active = await seedAttachment({ ticketId: ticket.id, originalFilename: "screenshot.png" });
 
-    const res = await request(app).get(`/api/tickets/${ticket.id}`).set("X-Requester-Id", String(requester.id));
+    const res = await request(app).get(`/api/tickets/${ticket.id}`).set("Cookie", await sessionCookieFor(requester.id));
 
     expect(res.status).toBe(200);
     expect(res.body.id).toBe(ticket.id);
@@ -144,7 +145,7 @@ describe("Ticket Detail", () => {
       relatedSystemId: relatedSystem.id,
     });
 
-    const res = await request(app).get(`/api/tickets/${ticket.id}`).set("X-Requester-Id", String(requester.id));
+    const res = await request(app).get(`/api/tickets/${ticket.id}`).set("Cookie", await sessionCookieFor(requester.id));
 
     expect(res.status).toBe(200);
     expect(res.body.attachments).toEqual([]);
@@ -162,7 +163,7 @@ describe("Ticket Detail", () => {
       relatedSystemId: relatedSystem.id,
     });
 
-    const res = await request(app).get(`/api/tickets/${ticket.id}`).set("X-Requester-Id", String(other.id));
+    const res = await request(app).get(`/api/tickets/${ticket.id}`).set("Cookie", await sessionCookieFor(other.id));
 
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ error: "Not found" });
@@ -174,7 +175,7 @@ describe("Ticket Detail", () => {
 
     const crossRequesterRes = await request(app)
       .get("/api/tickets/999999")
-      .set("X-Requester-Id", String(requester.id));
+      .set("Cookie", await sessionCookieFor(requester.id));
 
     const category = await seedCategory("Hardware");
     const relatedSystem = await seedRelatedSystem("Email");
@@ -186,7 +187,7 @@ describe("Ticket Detail", () => {
     });
     const notOwnedRes = await request(app)
       .get(`/api/tickets/${ticket.id}`)
-      .set("X-Requester-Id", String(requester.id));
+      .set("Cookie", await sessionCookieFor(requester.id));
 
     expect(crossRequesterRes.status).toBe(404);
     expect(notOwnedRes.status).toBe(404);
@@ -197,29 +198,29 @@ describe("Ticket Detail", () => {
   it("GET /api/tickets/abc (non-numeric id) returns 404 with the same body as the other not-found cases", async () => {
     const requester = await seedRequester("Alex Rivera", "alex@example.com");
 
-    const res = await request(app).get("/api/tickets/abc").set("X-Requester-Id", String(requester.id));
+    const res = await request(app).get("/api/tickets/abc").set("Cookie", await sessionCookieFor(requester.id));
 
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ error: "Not found" });
   });
 
-  // API-36
-  it("GET /api/tickets/:id without X-Requester-Id returns 400", async () => {
+  // API-36 (Lab 3 auth foundation superseded the header check with session
+  // auth — docs/lab-03/api-spec.md §0.1)
+  it("GET /api/tickets/:id without a session cookie returns 401", async () => {
     const res = await request(app).get("/api/tickets/1");
 
-    expect(res.status).toBe(400);
-    expect(res.body.errors).toEqual([
-      { field: "X-Requester-Id", message: "Missing or invalid requester header" },
-    ]);
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: "Not authenticated" });
   });
 
-  // API-37
-  it("GET /api/tickets/:id with a header that is not an active Requester returns 403", async () => {
+  // API-37 (Lab 3: an inactive user's session is rejected outright — BR-01,
+  // BR-36 — rather than the Lab 2 header-validity 403)
+  it("GET /api/tickets/:id with an inactive Requester's session returns 401", async () => {
     const inactive = await seedRequester("Inactive Person", "inactive@example.com", false);
 
-    const res = await request(app).get("/api/tickets/1").set("X-Requester-Id", String(inactive.id));
+    const res = await request(app).get("/api/tickets/1").set("Cookie", await sessionCookieFor(inactive.id));
 
-    expect(res.status).toBe(403);
-    expect(res.body).toEqual({ error: "Selected Requester is not active" });
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: "Not authenticated" });
   });
 });
