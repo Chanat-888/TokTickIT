@@ -1186,8 +1186,10 @@ async function findTicketById(idParam: string): Promise<Ticket | null> {
 }
 
 // specification.md §5 "Status transition matrix" — BR-19. Any pair not
-// listed here is rejected with 409.
-const STATUS_TRANSITIONS: Record<string, string[]> = {
+// listed here is rejected with 409. Exported so
+// status-transition.unit.test.ts (UNIT-05) can assert every pair directly,
+// without going through the API.
+export const STATUS_TRANSITIONS: Record<string, string[]> = {
   NEW: ["OPEN", "CANCELLED"],
   OPEN: ["IN_PROGRESS", "WAITING_FOR_REQUESTER", "CANCELLED"],
   IN_PROGRESS: ["WAITING_FOR_REQUESTER", "RESOLVED", "CANCELLED"],
