@@ -78,6 +78,15 @@ export async function deleteOtherSessions(userId: number, keepToken: string): Pr
   });
 }
 
+// api-spec.md §4 — an Administrator setting a new initial password for
+// another user (BR-29) has no session of the target's own to preserve
+// (unlike deleteOtherSessions above, self-initiated via BR-35): every
+// existing session for that user must end, or someone already signed in
+// stays signed in for up to 12 hours after their password was reset.
+export async function deleteAllSessions(userId: number): Promise<void> {
+  await getPrisma().session.deleteMany({ where: { userId } });
+}
+
 // Returns the authenticated User for a session token, or null if the token
 // is missing, unknown, expired, or belongs to a now-inactive user (BR-01,
 // BR-12, BR-36 — isActive is checked on every request, not only at login).

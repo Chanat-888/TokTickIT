@@ -551,3 +551,115 @@ export async function postNote(ticketId: number, body: string): Promise<Comment>
   }
   return (await res.json()) as Comment;
 }
+
+// ---------------------------------------------------------------------------
+// Issue 42 — Administrator User Management (api-spec.md §4).
+// ---------------------------------------------------------------------------
+
+export interface AdminUserListParams {
+  search?: string;
+  role?: Role;
+}
+
+export async function getAdminUsers(params: AdminUserListParams): Promise<User[]> {
+  const query = new URLSearchParams();
+  if (params.search !== undefined) query.set("search", params.search);
+  if (params.role !== undefined) query.set("role", params.role);
+
+  const qs = query.toString();
+  const res = await apiFetch(`/api/admin/users${qs ? `?${qs}` : ""}`);
+  if (!res.ok) {
+    throw new Error(`Admin users fetch failed with status ${res.status}`);
+  }
+  const body = (await res.json()) as { data: User[] };
+  return body.data;
+}
+
+export interface CreateUserInput {
+  name: string;
+  email: string;
+  role: Role;
+  isActive: boolean;
+  initialPassword: string;
+}
+
+export type CreateUserResult =
+  | { status: 201; user: User }
+  | { status: 400; errors: FieldError[] }
+  | { status: 409; error: string };
+
+export async function createUser(input: CreateUserInput): Promise<CreateUserResult> {
+  const res = await apiFetch("/api/admin/users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (res.status === 201) {
+    return { status: 201, user: (await res.json()) as User };
+  }
+  if (res.status === 400) {
+    const body = (await res.json()) as { errors: FieldError[] };
+    return { status: 400, errors: body.errors };
+  }
+  if (res.status === 409) {
+    const body = (await res.json()) as { error: string };
+    return { status: 409, error: body.error };
+  }
+  throw new Error(`Create user failed with status ${res.status}`);
+}
+
+export interface UpdateUserInput {
+  name?: string;
+  email?: string;
+  role?: Role;
+  isActive?: boolean;
+}
+
+export type UpdateUserResult =
+  | { status: 200; user: User }
+  | { status: 400; errors: FieldError[] }
+  | { status: 409; error: string };
+
+export async function updateUser(id: number, input: UpdateUserInput): Promise<UpdateUserResult> {
+  const res = await apiFetch(`/api/admin/users/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (res.status === 200) {
+    return { status: 200, user: (await res.json()) as User };
+  }
+  if (res.status === 400) {
+    const body = (await res.json()) as { errors: FieldError[] };
+    return { status: 400, errors: body.errors };
+  }
+  if (res.status === 409) {
+    const body = (await res.json()) as { error: string };
+    return { status: 409, error: body.error };
+  }
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  throw new Error(`Update user failed with status ${res.status}`);
+}
+
+export type SetUserPasswordResult = { status: 200; user: User } | { status: 400; errors: FieldError[] };
+
+export async function setUserPassword(id: number, newPassword: string): Promise<SetUserPasswordResult> {
+  const res = await apiFetch(`/api/admin/users/${id}/password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ newPassword }),
+  });
+  if (res.status === 200) {
+    return { status: 200, user: (await res.json()) as User };
+  }
+  if (res.status === 400) {
+    const body = (await res.json()) as { errors: FieldError[] };
+    return { status: 400, errors: body.errors };
+  }
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  throw new Error(`Set user password failed with status ${res.status}`);
+}

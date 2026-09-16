@@ -5,7 +5,7 @@ import multer from "multer";
 import path from "node:path";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
-import { Prisma, type Ticket, type Attachment, type PublicComment, type InternalNote, type User } from "@prisma/client";
+import { Prisma, type Ticket, type Attachment, type PublicComment, type InternalNote, type User, type Role } from "@prisma/client";
 import { getPrisma } from "./prisma.js";
 import { generateTicketNumber } from "./ticketNumber.js";
 import { validateTicketInput } from "./ticketValidation.js";
@@ -15,6 +15,7 @@ import {
   createSession,
   deleteSession,
   deleteOtherSessions,
+  deleteAllSessions,
   hashPassword,
   isValidPassword,
   toUserRepresentation,
@@ -63,6 +64,8 @@ const requireAnyRole = [
 // docs/lab-03/api-spec.md §3 — the IT Staff Queue and its supporting
 // endpoints.
 const requireStaff = [requireAuth, requirePasswordChanged, requireRole("IT_STAFF", "ADMINISTRATOR")];
+// docs/lab-03/api-spec.md §4 — Administrator User Management.
+const requireAdmin = [requireAuth, requirePasswordChanged, requireRole("ADMINISTRATOR")];
 
 // ---------------------------------------------------------------------------
 // Issue 2 — API health check
@@ -1380,6 +1383,254 @@ app.get("/api/tickets/:id/notes", requireStaff, async (req: Request, res: Respon
     return res.status(200).json({ data: notes.map(noteToJSON) });
   } catch (err) {
     console.error(`GET /api/tickets/${req.params.id}/notes failed:`, err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Issue 42 — Administrator User Management (docs/lab-03/api-spec.md §4,
+// specification.md §5 Phase 8).
+// ---------------------------------------------------------------------------
+
+const VALID_ROLES = new Set(["REQUESTER", "IT_STAFF", "ADMINISTRATOR"]);
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// BR-26: thrown inside the Serializable transaction below when the target
+// would be the last active Administrator; distinguished from a Postgres
+// serialization failure (P2034) so both map to the same 409, but only the
+// P2034 case needs the concurrent-write explanation.
+class LastAdminConflictError extends Error {}
+
+app.get("/api/admin/users", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    let role: Role | undefined;
+    if (req.query.role !== undefined) {
+      const raw = String(req.query.role);
+      if (!VALID_ROLES.has(raw)) {
+        return res.status(400).json({
+          errors: [{ field: "role", message: "role must be REQUESTER, IT_STAFF, or ADMINISTRATOR" }],
+        });
+      }
+      role = raw as Role;
+    }
+
+    const search = req.query.search !== undefined ? String(req.query.search) : undefined;
+    const where: Prisma.UserWhereInput = {};
+    if (role !== undefined) where.role = role;
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    const users = await getPrisma().user.findMany({ where, orderBy: { name: "asc" } });
+    return res.status(200).json({ data: users.map(toUserRepresentation) });
+  } catch (err) {
+    console.error("GET /api/admin/users failed:", err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
+app.post("/api/admin/users", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const body = (req.body ?? {}) as {
+      name?: unknown;
+      email?: unknown;
+      role?: unknown;
+      isActive?: unknown;
+      initialPassword?: unknown;
+    };
+    const errors: { field: string; message: string }[] = [];
+
+    if (typeof body.name !== "string" || !body.name.trim()) {
+      errors.push({ field: "name", message: "Name is required" });
+    }
+    if (typeof body.email !== "string" || !EMAIL_RE.test(body.email.trim())) {
+      errors.push({ field: "email", message: "A valid email is required" });
+    }
+    if (typeof body.role !== "string" || !VALID_ROLES.has(body.role)) {
+      errors.push({ field: "role", message: "role must be REQUESTER, IT_STAFF, or ADMINISTRATOR" });
+    }
+    if (typeof body.isActive !== "boolean") {
+      errors.push({ field: "isActive", message: "isActive must be a boolean" });
+    }
+    if (typeof body.initialPassword !== "string" || !isValidPassword(body.initialPassword)) {
+      errors.push({
+        field: "initialPassword",
+        message: "Password must be at least 8 characters and include a letter and a digit",
+      });
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({ errors });
+    }
+
+    const passwordHash = await hashPassword(body.initialPassword as string);
+    try {
+      // BR-30: mustChangePassword is always true for a newly created user.
+      const created = await getPrisma().user.create({
+        data: {
+          name: (body.name as string).trim(),
+          email: (body.email as string).trim().toLowerCase(),
+          role: body.role as Role,
+          isActive: body.isActive as boolean,
+          passwordHash,
+          mustChangePassword: true,
+        },
+      });
+      return res.status(201).json(toUserRepresentation(created));
+    } catch (err) {
+      if (isUniqueConstraintViolation(err, "email")) {
+        return res.status(409).json({ error: "Email already in use" });
+      }
+      throw err;
+    }
+  } catch (err) {
+    console.error("POST /api/admin/users failed:", err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
+app.patch("/api/admin/users/:id", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const body = (req.body ?? {}) as {
+      name?: unknown;
+      email?: unknown;
+      role?: unknown;
+      isActive?: unknown;
+    };
+    const errors: { field: string; message: string }[] = [];
+    const data: Prisma.UserUpdateInput = {};
+
+    if (body.name !== undefined) {
+      if (typeof body.name !== "string" || !body.name.trim()) {
+        errors.push({ field: "name", message: "Name must not be empty" });
+      } else {
+        data.name = body.name.trim();
+      }
+    }
+    if (body.email !== undefined) {
+      if (typeof body.email !== "string" || !EMAIL_RE.test(body.email.trim())) {
+        errors.push({ field: "email", message: "A valid email is required" });
+      } else {
+        data.email = body.email.trim().toLowerCase();
+      }
+    }
+    if (body.role !== undefined) {
+      if (typeof body.role !== "string" || !VALID_ROLES.has(body.role)) {
+        errors.push({ field: "role", message: "role must be REQUESTER, IT_STAFF, or ADMINISTRATOR" });
+      } else {
+        data.role = body.role as Role;
+      }
+    }
+    if (body.isActive !== undefined) {
+      if (typeof body.isActive !== "boolean") {
+        errors.push({ field: "isActive", message: "isActive must be a boolean" });
+      } else {
+        data.isActive = body.isActive;
+      }
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({ errors });
+    }
+
+    if (!/^\d+$/.test(req.params.id)) {
+      return res.status(404).json({ error: "Not found" });
+    }
+    const existing = await getPrisma().user.findUnique({ where: { id: Number(req.params.id) } });
+    if (!existing) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    // BR-25: cannot deactivate self.
+    if (data.isActive === false && existing.id === req.user!.id) {
+      return res.status(409).json({ error: "You cannot deactivate your own account" });
+    }
+
+    // BR-26: the last active Administrator cannot be deactivated or have
+    // their role changed away from Administrator.
+    const losingAdminStatus =
+      existing.role === "ADMINISTRATOR" &&
+      existing.isActive &&
+      (data.isActive === false || (data.role !== undefined && data.role !== "ADMINISTRATOR"));
+
+    try {
+      // Review (PR #53): a plain count-then-update has a write-skew gap —
+      // two Administrators demoting each other at once could each count
+      // the other as the "one active Administrator remaining" and both
+      // succeed, leaving zero. Serializable isolation makes Postgres detect
+      // that exact cross-transaction read/write dependency and abort one
+      // side (P2034 below) instead of letting both writes land.
+      const updated = await getPrisma().$transaction(
+        async (tx) => {
+          if (losingAdminStatus) {
+            const otherActiveAdmins = await tx.user.count({
+              where: { role: "ADMINISTRATOR", isActive: true, id: { not: existing.id } },
+            });
+            if (otherActiveAdmins === 0) {
+              throw new LastAdminConflictError();
+            }
+          }
+          return tx.user.update({ where: { id: existing.id }, data });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+      return res.status(200).json(toUserRepresentation(updated));
+    } catch (err) {
+      if (err instanceof LastAdminConflictError) {
+        return res.status(409).json({ error: "At least one active Administrator is required" });
+      }
+      if (isUniqueConstraintViolation(err, "email")) {
+        return res.status(409).json({ error: "Email already in use" });
+      }
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2034") {
+        return res.status(409).json({ error: "At least one active Administrator is required" });
+      }
+      throw err;
+    }
+  } catch (err) {
+    console.error(`PATCH /api/admin/users/${req.params.id} failed:`, err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
+// BR-29: setting a new initial password forces mustChangePassword back to
+// true; never shares a request body with the name/email/role/isActive edit
+// above (BR-31).
+app.post("/api/admin/users/:id/password", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const body = (req.body ?? {}) as { newPassword?: unknown };
+    if (typeof body.newPassword !== "string" || !isValidPassword(body.newPassword)) {
+      return res.status(400).json({
+        errors: [
+          { field: "newPassword", message: "Password must be at least 8 characters and include a letter and a digit" },
+        ],
+      });
+    }
+
+    if (!/^\d+$/.test(req.params.id)) {
+      return res.status(404).json({ error: "Not found" });
+    }
+    const existing = await getPrisma().user.findUnique({ where: { id: Number(req.params.id) } });
+    if (!existing) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const passwordHash = await hashPassword(body.newPassword);
+    const updated = await getPrisma().user.update({
+      where: { id: existing.id },
+      data: { passwordHash, mustChangePassword: true },
+    });
+    // Review (PR #53): an admin-initiated reset has no session of the
+    // target's own to preserve, unlike a self-initiated change (BR-35) —
+    // every existing session for the target must end, or someone already
+    // signed in as that account stays signed in for up to 12 hours.
+    await deleteAllSessions(existing.id);
+    return res.status(200).json(toUserRepresentation(updated));
+  } catch (err) {
+    console.error(`POST /api/admin/users/${req.params.id}/password failed:`, err);
     res.status(500).json({ error: "Unexpected server error" });
   }
 });

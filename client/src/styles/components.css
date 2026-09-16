@@ -917,3 +917,136 @@ textarea.field__control {
   gap: var(--space-xs);
   align-items: flex-start;
 }
+
+/* ---------------------------------------------------------------------- */
+/* Administrator User Management — ui-spec.md §5.7, §7                    */
+/* ---------------------------------------------------------------------- */
+
+.user-management {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.user-management__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  align-items: center;
+}
+
+/* ui-spec.md §5.7 — Active pill; Inactive reuses `.status-badge--terminal`
+   directly (same muted treatment as a Closed/Cancelled Ticket Status). */
+.badge--user-active {
+  background: var(--color-pale-green);
+  border-color: var(--color-secondary-green);
+  color: var(--color-secondary-green);
+}
+
+.user-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.user-table th,
+.user-table td {
+  padding: var(--space-sm) var(--space-md);
+  text-align: left;
+  border-bottom: 1px solid var(--color-field-border);
+  font-size: var(--font-size-body);
+}
+
+.user-card-list {
+  display: none;
+}
+
+.user-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-lg);
+  border: 1px solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.user-card__header-row,
+.user-card__footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.user-card__name {
+  font-weight: 600;
+}
+
+@media (max-width: 767px) {
+  .user-table {
+    display: none;
+  }
+
+  .user-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+}
+
+/* ui-spec.md §5.7 — Create/Edit panel, rendered inline below the toolbar
+   rather than a true modal (kept simple per specification.md §3 "small"). */
+.user-form-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-xl);
+  background: var(--color-surface);
+  border-radius: var(--radius-control);
+}
+
+.user-form-panel__row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-lg);
+}
+
+@media (max-width: 767px) {
+  .user-form-panel__row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.user-form-panel__actions {
+  display: flex;
+  gap: var(--space-md);
+}
+
+/* ui-spec.md §5.7 — "Set New Initial Password" sub-panel: a separate,
+   explicit action (BR-31), never sharing a form with name/email/role/active
+   edits. Reuses .confirm-dialog's structure since both are a small
+   focused control inline below their trigger. */
+.password-reset-subpanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-page-bg);
+}
+
+/* ui-spec.md §5.7 — self-deactivation/last-Administrator protection message,
+   shown next to the disabled Active toggle (BR-25/BR-26; the disabled state
+   is UI convenience, the server check is authoritative). */
+.user-form-panel__active-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
