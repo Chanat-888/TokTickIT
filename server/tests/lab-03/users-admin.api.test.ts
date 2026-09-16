@@ -275,6 +275,24 @@ describe("Administrator User Management", () => {
     expect(res.body.mustChangePassword).toBe(true);
   });
 
+  // PR #53 review: an admin-initiated reset has no session of the target's
+  // own to preserve, unlike a self-initiated change (BR-35) — every
+  // existing session for the target must end.
+  it("POST /api/admin/users/:id/password invalidates the target's existing sessions", async () => {
+    const admin = await seedUser({ name: "Robin Park", role: "ADMINISTRATOR" });
+    const target = await seedUser({ name: "Jordan Blake", role: "IT_STAFF" });
+    await sessionCookieFor(target.id);
+    expect(await getPrisma().session.count({ where: { userId: target.id } })).toBe(1);
+
+    const res = await request(app)
+      .post(`/api/admin/users/${target.id}/password`)
+      .set("Cookie", await sessionCookieFor(admin.id))
+      .send({ newPassword: "NewPassword1" });
+
+    expect(res.status).toBe(200);
+    expect(await getPrisma().session.count({ where: { userId: target.id } })).toBe(0);
+  });
+
   // API-61
   it("Every /api/admin/users... endpoint called with an IT Staff or Requester session returns 403", async () => {
     const staff = await seedUser({ name: "Jordan Blake", role: "IT_STAFF" });

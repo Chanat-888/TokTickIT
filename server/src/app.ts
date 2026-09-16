@@ -15,6 +15,7 @@ import {
   createSession,
   deleteSession,
   deleteOtherSessions,
+  deleteAllSessions,
   hashPassword,
   isValidPassword,
   toUserRepresentation,
@@ -1394,6 +1395,12 @@ app.get("/api/tickets/:id/notes", requireStaff, async (req: Request, res: Respon
 const VALID_ROLES = new Set(["REQUESTER", "IT_STAFF", "ADMINISTRATOR"]);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// BR-26: thrown inside the Serializable transaction below when the target
+// would be the last active Administrator; distinguished from a Postgres
+// serialization failure (P2034) so both map to the same 409, but only the
+// P2034 case needs the concurrent-write explanation.
+class LastAdminConflictError extends Error {}
+
 app.get("/api/admin/users", requireAdmin, async (req: Request, res: Response) => {
   try {
     let role: Role | undefined;
@@ -1548,21 +1555,38 @@ app.patch("/api/admin/users/:id", requireAdmin, async (req: Request, res: Respon
       existing.role === "ADMINISTRATOR" &&
       existing.isActive &&
       (data.isActive === false || (data.role !== undefined && data.role !== "ADMINISTRATOR"));
-    if (losingAdminStatus) {
-      const otherActiveAdmins = await getPrisma().user.count({
-        where: { role: "ADMINISTRATOR", isActive: true, id: { not: existing.id } },
-      });
-      if (otherActiveAdmins === 0) {
-        return res.status(409).json({ error: "At least one active Administrator is required" });
-      }
-    }
 
     try {
-      const updated = await getPrisma().user.update({ where: { id: existing.id }, data });
+      // Review (PR #53): a plain count-then-update has a write-skew gap —
+      // two Administrators demoting each other at once could each count
+      // the other as the "one active Administrator remaining" and both
+      // succeed, leaving zero. Serializable isolation makes Postgres detect
+      // that exact cross-transaction read/write dependency and abort one
+      // side (P2034 below) instead of letting both writes land.
+      const updated = await getPrisma().$transaction(
+        async (tx) => {
+          if (losingAdminStatus) {
+            const otherActiveAdmins = await tx.user.count({
+              where: { role: "ADMINISTRATOR", isActive: true, id: { not: existing.id } },
+            });
+            if (otherActiveAdmins === 0) {
+              throw new LastAdminConflictError();
+            }
+          }
+          return tx.user.update({ where: { id: existing.id }, data });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
       return res.status(200).json(toUserRepresentation(updated));
     } catch (err) {
+      if (err instanceof LastAdminConflictError) {
+        return res.status(409).json({ error: "At least one active Administrator is required" });
+      }
       if (isUniqueConstraintViolation(err, "email")) {
         return res.status(409).json({ error: "Email already in use" });
+      }
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2034") {
+        return res.status(409).json({ error: "At least one active Administrator is required" });
       }
       throw err;
     }
@@ -1599,6 +1623,11 @@ app.post("/api/admin/users/:id/password", requireAdmin, async (req: Request, res
       where: { id: existing.id },
       data: { passwordHash, mustChangePassword: true },
     });
+    // Review (PR #53): an admin-initiated reset has no session of the
+    // target's own to preserve, unlike a self-initiated change (BR-35) —
+    // every existing session for the target must end, or someone already
+    // signed in as that account stays signed in for up to 12 hours.
+    await deleteAllSessions(existing.id);
     return res.status(200).json(toUserRepresentation(updated));
   } catch (err) {
     console.error(`POST /api/admin/users/${req.params.id}/password failed:`, err);

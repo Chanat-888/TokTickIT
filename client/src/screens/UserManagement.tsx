@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   createUser,
   getAdminUsers,
@@ -66,14 +66,23 @@ export default function UserManagement() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
+  // Review (PR #53): guards against out-of-order responses, same as
+  // StaffTicketQueue.tsx — two quick search/filter changes can resolve in
+  // reverse network order, otherwise leaving a stale result on screen after
+  // a newer request already returned.
+  const latestRequestId = useRef(0);
+
   const load = useCallback(() => {
+    const requestId = ++latestRequestId.current;
     setLoadState("loading");
     getAdminUsers({ search: debouncedSearch || undefined, role: roleFilter || undefined })
       .then((data) => {
+        if (latestRequestId.current !== requestId) return;
         setUsers(data);
         setLoadState("loaded");
       })
       .catch((err: unknown) => {
+        if (latestRequestId.current !== requestId) return;
         const status = err instanceof Error ? Number(err.message.match(/status (\d+)/)?.[1]) : undefined;
         setLoadState(status === 403 ? "forbidden" : "error");
       });
