@@ -152,50 +152,17 @@ test("RESP-06 Ticket Detail header grid rearranges fields by breakpoint", async 
 // RESP-07 and tests.md §4 — screenshot checklist
 // ---------------------------------------------------------------------
 
-test.describe("Screenshot checklist — Requester Selection", () => {
-  test("requester-select loading/loaded/empty/failure (desktop)", async ({ page }) => {
-    await page.setViewportSize(DESKTOP);
-
-    await test.step("loading", async () => {
-      await page.route("**/api/requesters", async (route) => {
-        await new Promise((r) => setTimeout(r, 1500));
-        await route.continue();
-      });
-      const responsePromise = page.waitForResponse("**/api/requesters");
-      await page.goto("/select-requester");
-      await expect(page.locator(".state-banner--loading")).toBeVisible();
-      await page.screenshot({ path: shotPath("create-ticket", "requester-select-loading-desktop.png"), fullPage: true });
-      // Wait for the delayed response to actually resolve before unrouting —
-      // otherwise the pending handler's route.continue() can fire after a
-      // later navigation has already disposed the route (Playwright then
-      // throws "Route is already handled").
-      await responsePromise;
-      await page.unroute("**/api/requesters");
-    });
-
-    await test.step("loaded", async () => {
-      await page.goto("/select-requester");
-      await expect(page.locator(".requester-select__dropdown")).toBeVisible();
-      await page.screenshot({ path: shotPath("create-ticket", "requester-select-loaded-desktop.png"), fullPage: true });
-    });
-
-    await test.step("empty", async () => {
-      await page.route("**/api/requesters", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
-      await page.goto("/select-requester");
-      await expect(page.getByText("No active Development Requesters are available.")).toBeVisible();
-      await page.screenshot({ path: shotPath("create-ticket", "requester-select-empty-desktop.png"), fullPage: true });
-      await page.unroute("**/api/requesters");
-    });
-
-    await test.step("failure", async () => {
-      await page.route("**/api/requesters", (route) => route.fulfill({ status: 500, contentType: "application/json", body: '{"error":"Unexpected server error"}' }));
-      await page.goto("/select-requester");
-      await expect(page.locator(".state-banner--error")).toBeVisible();
-      await page.screenshot({ path: shotPath("create-ticket", "requester-select-failure-desktop.png"), fullPage: true });
-      await page.unroute("**/api/requesters");
-    });
-  });
-});
+// The "Screenshot checklist — Requester Selection" describe block that
+// lived here captured the Development Requester selector's loading/loaded/
+// empty/failure states (/select-requester, GET /api/requesters). Both were
+// removed entirely by specification.md BR-15 (Lab 3 Phase 4, replacing the
+// selector with real login) — not relocated, so there is no screen left to
+// screenshot. Removed rather than repointed at Login, since Lab 3 already
+// has its own authoritative Login screenshot checklist
+// (artifacts/lab-03/screenshots/authentication/); duplicating it here under
+// Lab 2's evidence folder would just be redundant. The four stale PNGs this
+// block produced were deleted from screenshots/create-ticket/ alongside
+// this removal.
 
 test.describe("Screenshot checklist — Create Ticket", () => {
   test("create-ticket initial at all three viewports", async ({ page }) => {
@@ -360,8 +327,9 @@ test.describe("Screenshot checklist — My Tickets", () => {
     });
 
     await test.step("after switch (Sam Okafor)", async () => {
-      await page.locator(".app-shell__change-requester-btn").click();
-      await page.waitForURL("**/select-requester");
+      // See requester-ticket-flow.spec.ts's E2E-06 comment — the
+      // click-through-to-/select-requester step no longer exists;
+      // selectRequester() already logs the new Requester in directly.
       await selectRequester(page, "Sam Okafor");
       await page.goto("/tickets");
       await expect(page.locator(".my-tickets")).toBeVisible();
