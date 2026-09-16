@@ -229,9 +229,12 @@ New classes, for elements Lab 2 did not have:
 
 Following the Lab 2 convention (`docs/lab-02/ui-spec.md` §18) and
 specification.md §7's repository structure:
-`artifacts/lab-03/screenshots/{authentication,staff-queue,staff-ticket-detail,user-management}/`,
+`artifacts/lab-03/screenshots/{authentication,staff-queue,staff-ticket-detail,user-management,requester-ticket-detail}/`,
 one desktop + tablet + mobile capture per required screen state listed in
-§4 and §5 above.
+§4 and §5 above. `requester-ticket-detail/` was added during issue #44 —
+the original four folders above don't map to §5.4's Requester Ticket
+Detail additions (Public Comments tab, "Problem Appears Resolved"
+button), which needed a home.
 
 ## 9. Open questions / resolved decisions
 
