@@ -45,8 +45,16 @@ export function isValidPassword(password: string): boolean {
   return password.length >= 8 && /[A-Za-z]/.test(password) && /[0-9]/.test(password);
 }
 
-function hashToken(token: string): string {
+// Exported (rather than a private helper) so session.unit.test.ts (UNIT-03)
+// can assert its hashing behavior without going through the database.
+export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
+}
+
+// BR-12, extracted as a pure function so session.unit.test.ts (UNIT-04) can
+// test the expiry boundary directly, without seeding a Session row.
+export function isSessionExpired(expiresAt: Date): boolean {
+  return expiresAt <= new Date();
 }
 
 export async function createSession(userId: number): Promise<{ token: string; expiresAt: Date }> {
@@ -97,7 +105,7 @@ export async function getSessionUser(token: string | undefined): Promise<User | 
     include: { user: true },
   });
   if (!session) return null;
-  if (session.expiresAt <= new Date()) return null;
+  if (isSessionExpired(session.expiresAt)) return null;
   if (!session.user.isActive) return null;
   return session.user;
 }

@@ -45,13 +45,16 @@ test("E2E-01 full happy path: create a ticket with an attachment, then view it",
   await expect(attachmentRows.first()).toContainText("sample.pdf");
 });
 
-// E2E-02 — AC-02: opening My Tickets with no Requester selected.
-test("E2E-02 opening My Tickets with no Requester selected redirects to Requester Selection", async ({
-  page,
-}) => {
+// E2E-02 — AC-02: opening My Tickets with no session. The Development
+// Requester selector this originally targeted was removed by
+// specification.md BR-15 (Lab 3 Phase 4) in favor of real login; the
+// behavior this test actually cares about — an unauthenticated visit to a
+// protected route doesn't show the screen — now redirects to /login
+// instead of /select-requester.
+test("E2E-02 opening My Tickets with no session redirects to Login", async ({ page }) => {
   await page.goto("/tickets");
-  await page.waitForURL("**/select-requester");
-  expect(page.url()).toContain("/select-requester");
+  await page.waitForURL("**/login");
+  expect(page.url()).toContain("/login");
 });
 
 // E2E-03 — AC-04: submitting Create Ticket with invalid data.
