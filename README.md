@@ -79,13 +79,22 @@ npx prisma migrate deploy
 npm run prisma:seed
 ```
 
-This applies both migrations (Lab 1's `Category` table, then Lab 2's
-`RequesterUser`, `RelatedSystem`, `Ticket`, and `Attachment` tables) and
-seeds: 4 Categories, 6 Related Systems, 5 Development Requesters (4 active,
-1 inactive), and ~30 Tickets split 25/5/0 across three of the active
-Requesters. The seed uses `upsert` for reference data and is otherwise
-idempotent for Tickets — running it more than once produces the same
+This applies all three migrations (Lab 1's `Category` table; Lab 2's
+`RequesterUser`, `RelatedSystem`, `Ticket`, and `Attachment` tables; Lab
+3's rename of `RequesterUser` to `User` plus `Session`, `PublicComment`,
+`InternalNote`, and the new `Ticket` workflow columns) and seeds:
+4 Categories, 6 Related Systems, 10 Users (5 Requesters — 4 active, 1
+inactive; 4 IT Staff — 3 active, 1 inactive; 1 active Administrator), and
+~30 Tickets split 25/5/0 across three of the active Requesters, a subset
+of which are claimed with a mix of IT Priority/status/sample Public
+Comments and Internal Notes. The seed uses `upsert` for reference data and
+is otherwise idempotent — running it more than once produces the same
 counts, not duplicates.
+
+**Seeded login (local development only, never a real secret):** every
+seeded account shares the password `ChangeMe123!` and must change it at
+first login (`mustChangePassword`). See `server/prisma/seed.ts` for the
+full account list and roles.
 
 ## Running the application
 

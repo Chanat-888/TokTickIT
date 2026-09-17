@@ -1,21 +1,25 @@
 import { useState, type ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { useRequester } from "../lib/requesterContext.js";
+import { useAuth } from "../lib/authContext.js";
 
 interface AppShellProps {
   children: ReactNode;
 }
 
+const ROLE_LABEL: Record<string, string> = {
+  REQUESTER: "Requester",
+  IT_STAFF: "IT Staff",
+  ADMINISTRATOR: "Administrator",
+};
+
 export default function AppShell({ children }: AppShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const { requester, clearRequester } = useRequester();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  // ui-spec.md §10 / UI-34: no confirmation step — this discards no server
-  // data, only the client-side selection.
-  function handleChangeRequester() {
-    clearRequester();
-    navigate("/select-requester");
+  async function handleLogout() {
+    await logout();
+    navigate("/login", { replace: true });
   }
 
   const navLinkClassName = ({ isActive }: { isActive: boolean }) =>
@@ -27,22 +31,37 @@ export default function AppShell({ children }: AppShellProps) {
         <span>TokTickIT</span>
 
         <nav className="app-shell__nav" aria-label="Primary">
-          <NavLink to="/tickets" end className={navLinkClassName}>
-            My Tickets
-          </NavLink>
-          <NavLink to="/tickets/new" className={navLinkClassName}>
-            Create Ticket
-          </NavLink>
+          {user?.role === "REQUESTER" && (
+            <>
+              <NavLink to="/tickets" end className={navLinkClassName}>
+                My Tickets
+              </NavLink>
+              <NavLink to="/tickets/new" className={navLinkClassName}>
+                Create Ticket
+              </NavLink>
+            </>
+          )}
+          {(user?.role === "IT_STAFF" || user?.role === "ADMINISTRATOR") && (
+            <NavLink to="/staff/tickets" className={navLinkClassName}>
+              Ticket Queue
+            </NavLink>
+          )}
+          {user?.role === "ADMINISTRATOR" && (
+            <NavLink to="/admin/users" className={navLinkClassName}>
+              User Management
+            </NavLink>
+          )}
         </nav>
 
-        <span className="app-shell__requester">{requester?.name ?? ""}</span>
+        <span className="app-shell__requester">{user?.name ?? ""}</span>
+        {user && <span className="role-badge">{ROLE_LABEL[user.role]}</span>}
 
         <button
           type="button"
           className="btn btn--secondary app-shell__change-requester-btn"
-          onClick={handleChangeRequester}
+          onClick={handleLogout}
         >
-          Change Requester
+          Logout
         </button>
 
         <button

@@ -45,13 +45,16 @@ test("E2E-01 full happy path: create a ticket with an attachment, then view it",
   await expect(attachmentRows.first()).toContainText("sample.pdf");
 });
 
-// E2E-02 — AC-02: opening My Tickets with no Requester selected.
-test("E2E-02 opening My Tickets with no Requester selected redirects to Requester Selection", async ({
-  page,
-}) => {
+// E2E-02 — AC-02: opening My Tickets with no session. The Development
+// Requester selector this originally targeted was removed by
+// specification.md BR-15 (Lab 3 Phase 4) in favor of real login; the
+// behavior this test actually cares about — an unauthenticated visit to a
+// protected route doesn't show the screen — now redirects to /login
+// instead of /select-requester.
+test("E2E-02 opening My Tickets with no session redirects to Login", async ({ page }) => {
   await page.goto("/tickets");
-  await page.waitForURL("**/select-requester");
-  expect(page.url()).toContain("/select-requester");
+  await page.waitForURL("**/login");
+  expect(page.url()).toContain("/login");
 });
 
 // E2E-03 — AC-04: submitting Create Ticket with invalid data.
@@ -194,7 +197,15 @@ test("E2E-05 adding then removing an attachment updates the row in place, withou
   expect(markerStillPresent).toBe(true);
 });
 
-// E2E-06 — AC-22, BR-08: Change Requester mid-session, A -> B.
+// E2E-06 — AC-22, BR-08: Change Requester mid-session, A -> B. The
+// Development Requester selector this originally clicked through to
+// (.app-shell__change-requester-btn -> /select-requester) was removed by
+// specification.md BR-15 (Lab 3 Phase 4) in favor of real login; that CSS
+// class is now reused by the Logout button (same header position), and
+// clicking it no longer navigates anywhere resembling a Requester picker.
+// selectRequester() itself already clears the session and logs in as the
+// named Requester (see its doc comment in fixtures.ts), so "switching"
+// mid-test is just calling it again for the new name.
 test("E2E-06 switching Requester replaces the ticket list with the new Requester's own tickets", async ({
   page,
 }) => {
@@ -208,56 +219,63 @@ test("E2E-06 switching Requester replaces the ticket list with the new Requester
     .first()
     .innerText();
 
-  await page.locator(".app-shell__change-requester-btn").click();
-  await page.waitForURL("**/select-requester");
   await selectRequester(page, "Sam Okafor");
+  await page.goto("/tickets");
 
   await expect(page.getByText(alexTicketNumber, { exact: true })).toHaveCount(0);
   await expect(page.locator(".ticket-list__pagination-summary")).toContainText("of 5");
 });
 
-// E2E-07 — AC-25: keyboard-only navigation of Requester Selection.
-test("E2E-07 Requester Selection is fully operable via keyboard with a visible focus indicator", async ({
-  page,
-}) => {
-  await page.goto("/select-requester");
+// E2E-07 — AC-25: keyboard-only navigation. The Requester Selection screen
+// this originally targeted (#requester-select-dropdown,
+// .requester-select__continue-btn) no longer exists at all — BR-15 removed
+// it, not merely relocated it, so there is no reachable equivalent of that
+// specific dropdown-then-continue flow. The closest genuinely-reachable
+// screen serving the same role (the first keyboard-operable screen an
+// unauthenticated visitor reaches) is now Login, so this exercises that
+// instead: Tab to Email, then Password, then Submit, each with a visible
+// focus indicator, submitting via Enter.
+test("E2E-07 Login is fully operable via keyboard with a visible focus indicator", async ({ page }) => {
+  // Self-healing like fixtures.ts's selectRequester()/attemptLogin() — an
+  // earlier test in this shared single-worker run may have already changed
+  // Alex Rivera's password away from the seed value. The two literals here
+  // duplicate fixtures.ts's own (unexported) SEED_PASSWORD/CHANGED_PASSWORD.
+  async function tabFillSubmit(password: string): Promise<boolean> {
+    await page.goto("/login");
 
-  let reachedDropdown = false;
-  for (let i = 0; i < 10; i++) {
     await page.keyboard.press("Tab");
-    const focused = page.locator(":focus");
-    const id = await focused.evaluate((el) => el.id).catch(() => "");
-    if (id === "requester-select-dropdown") {
-      reachedDropdown = true;
-      break;
-    }
-  }
-  expect(reachedDropdown).toBe(true);
+    await expect(page.locator("#login-email")).toBeFocused();
+    await expect(page.locator(":focus")).toHaveCSS("outline-style", "solid");
+    await page.keyboard.type("alex.rivera@example.com");
 
-  const dropdown = page.locator(":focus");
-  await expect(dropdown).toHaveCSS("outline-style", "solid");
-
-  // Arrow-key select the first active Requester (Alex Rivera, lowest id).
-  await page.keyboard.press("ArrowDown");
-
-  let reachedContinue = false;
-  for (let i = 0; i < 5; i++) {
     await page.keyboard.press("Tab");
-    const focused = page.locator(":focus");
-    const className = await focused.evaluate((el) => el.className).catch(() => "");
-    if (className.includes("requester-select__continue-btn")) {
-      reachedContinue = true;
-      break;
-    }
-  }
-  expect(reachedContinue).toBe(true);
-  await expect(page.locator(":focus")).toHaveCSS("outline-style", "solid");
+    await expect(page.locator("#login-password")).toBeFocused();
+    await expect(page.locator(":focus")).toHaveCSS("outline-style", "solid");
+    await page.keyboard.type(password);
 
-  await page.keyboard.press("Enter");
-  await page.waitForURL("**/tickets");
+    await page.keyboard.press("Tab");
+    await expect(page.locator('button[type="submit"]')).toBeFocused();
+    await expect(page.locator(":focus")).toHaveCSS("outline-style", "solid");
+
+    await page.keyboard.press("Enter");
+    await Promise.race([
+      page.waitForURL((url) => !url.pathname.startsWith("/login")),
+      page.locator(".state-banner--error").waitFor({ state: "visible" }),
+    ]);
+    return !page.url().includes("/login");
+  }
+
+  let ok = await tabFillSubmit("ChangeMe123!");
+  if (!ok) {
+    ok = await tabFillSubmit("ChangedPassword1");
+  }
+  expect(ok).toBe(true);
 });
 
-// E2E-08 — AC-03: Requester B opens Requester A's Ticket Detail URL directly.
+// E2E-08 — AC-03: Requester B opens Requester A's Ticket Detail URL
+// directly. Switches Requester the same way E2E-06 now does — see that
+// test's comment on why the old click-through-to-/select-requester step is
+// gone.
 test("E2E-08 opening another Requester's Ticket Detail URL directly renders the not-found panel", async ({
   page,
 }) => {
@@ -268,8 +286,6 @@ test("E2E-08 opening another Requester's Ticket Detail URL directly renders the 
   const url = page.url();
   const ticketId = url.match(/\/tickets\/(\d+)$/)![1];
 
-  await page.locator(".app-shell__change-requester-btn").click();
-  await page.waitForURL("**/select-requester");
   await selectRequester(page, "Sam Okafor");
 
   await page.goto(`/tickets/${ticketId}`);

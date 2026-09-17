@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
+import { sessionCookieFor } from "../authHelpers.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const serverRoot = path.join(__dirname, "..", "..");
@@ -18,7 +19,7 @@ const { getPrisma } = await import("../../src/prisma.js");
 
 async function truncateAll() {
   await getPrisma().$executeRawUnsafe(
-    `TRUNCATE TABLE "Attachment", "Ticket", "RequesterUser", "RelatedSystem", "Category" RESTART IDENTITY CASCADE;`,
+    `TRUNCATE TABLE "Attachment", "Ticket", "User", "RelatedSystem", "Category" RESTART IDENTITY CASCADE;`,
   );
 }
 
@@ -31,7 +32,9 @@ async function seedRelatedSystem(name: string, isActive = true) {
 }
 
 async function seedRequester(name: string, email: string, isActive = true) {
-  return getPrisma().requesterUser.create({ data: { name, email, isActive } });
+  return getPrisma().user.create({
+    data: { name, email, isActive, passwordHash: "unused-in-lab2-tests", role: "REQUESTER", mustChangePassword: false },
+  });
 }
 
 function validBody(overrides: Record<string, unknown> = {}) {
@@ -103,7 +106,7 @@ describe("Create Ticket", () => {
 
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .set("Idempotency-Key", randomUUID())
       .send(validBody());
 
@@ -113,29 +116,38 @@ describe("Create Ticket", () => {
     expect(res.body.requesterId).toBe(requester.id);
   });
 
-  // API-05
-  it("POST /api/tickets without X-Requester-Id returns 400", async () => {
+  // API-05 (Lab 3 auth foundation superseded the header check with session
+  // auth — docs/lab-03/api-spec.md §0.1)
+  it("POST /api/tickets without a session cookie returns 401", async () => {
     const res = await request(app)
       .post("/api/tickets")
       .set("Idempotency-Key", randomUUID())
       .send(validBody());
 
-    expect(res.status).toBe(400);
-    expect(res.body.errors).toEqual([
-      { field: "X-Requester-Id", message: "Missing or invalid requester header" },
-    ]);
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: "Not authenticated" });
   });
 
-  // API-06
-  it("POST /api/tickets with a header that isn't an active Requester returns 403", async () => {
+  // API-06 (Lab 3: role, not header validity, is now the gate —
+  // docs/lab-03/api-spec.md §2)
+  it("POST /api/tickets with a non-Requester session returns 403", async () => {
+    const staff = await getPrisma().user.create({
+      data: {
+        name: "Staff",
+        email: "staff@example.com",
+        passwordHash: "x",
+        role: "IT_STAFF",
+        mustChangePassword: false,
+      },
+    });
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Requester-Id", "999")
+      .set("Cookie", await sessionCookieFor(staff.id))
       .set("Idempotency-Key", randomUUID())
       .send(validBody());
 
     expect(res.status).toBe(403);
-    expect(res.body).toEqual({ error: "Selected Requester is not active" });
+    expect(res.body).toEqual({ error: "Forbidden" });
   });
 
   // API-07
@@ -146,7 +158,7 @@ describe("Create Ticket", () => {
 
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .set("Idempotency-Key", randomUUID())
       .send(validBody({ summary: "" }));
 
@@ -165,7 +177,7 @@ describe("Create Ticket", () => {
 
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .set("Idempotency-Key", randomUUID())
       .send(validBody({ description: "a".repeat(9) }));
 
@@ -183,7 +195,7 @@ describe("Create Ticket", () => {
 
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .set("Idempotency-Key", randomUUID())
       .send(validBody({ categoryId: category.id }));
 
@@ -200,7 +212,7 @@ describe("Create Ticket", () => {
 
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .set("Idempotency-Key", randomUUID())
       .send(validBody({ relatedSystemId: 999 }));
 
@@ -218,7 +230,7 @@ describe("Create Ticket", () => {
 
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .set("Idempotency-Key", randomUUID())
       .send(validBody({ requestedPriority: "URGENT" }));
 
@@ -237,14 +249,14 @@ describe("Create Ticket", () => {
 
     const first = await request(app)
       .post("/api/tickets")
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .set("Idempotency-Key", idempotencyKey)
       .send(validBody());
     expect(first.status).toBe(201);
 
     const second = await request(app)
       .post("/api/tickets")
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .set("Idempotency-Key", idempotencyKey)
       .send(validBody());
 
@@ -264,14 +276,14 @@ describe("Create Ticket", () => {
 
     const first = await request(app)
       .post("/api/tickets")
-      .set("X-Requester-Id", String(alex.id))
+      .set("Cookie", await sessionCookieFor(alex.id))
       .set("Idempotency-Key", idempotencyKey)
       .send(validBody());
     expect(first.status).toBe(201);
 
     const second = await request(app)
       .post("/api/tickets")
-      .set("X-Requester-Id", String(sam.id))
+      .set("Cookie", await sessionCookieFor(sam.id))
       .set("Idempotency-Key", idempotencyKey)
       .send(validBody());
 
@@ -294,12 +306,12 @@ describe("Create Ticket", () => {
     const [first, second] = await Promise.all([
       request(app)
         .post("/api/tickets")
-        .set("X-Requester-Id", String(requester.id))
+        .set("Cookie", await sessionCookieFor(requester.id))
         .set("Idempotency-Key", idempotencyKey)
         .send(validBody()),
       request(app)
         .post("/api/tickets")
-        .set("X-Requester-Id", String(requester.id))
+        .set("Cookie", await sessionCookieFor(requester.id))
         .set("Idempotency-Key", idempotencyKey)
         .send(validBody()),
     ]);
@@ -317,7 +329,7 @@ describe("Create Ticket", () => {
 
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .set("Idempotency-Key", randomUUID())
       .send(
         validBody({
@@ -339,7 +351,7 @@ describe("Create Ticket", () => {
 
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .send(validBody());
 
     expect(res.status).toBe(400);
@@ -357,7 +369,7 @@ describe("Create Ticket", () => {
 
     const res = await request(app)
       .post("/api/tickets")
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .set("Idempotency-Key", "abc")
       .send(validBody());
 

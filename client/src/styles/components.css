@@ -128,10 +128,63 @@
   color: var(--color-error);
 }
 
-.badge--status-new {
+.badge--status-new,
+.badge--status-open,
+.badge--status-in_progress,
+.badge--status-waiting_for_requester,
+.badge--status-reopened,
+.badge--status-resolved {
   background: var(--color-pale-green);
   border-color: var(--color-secondary-green);
   color: var(--color-secondary-green);
+}
+
+/* docs/lab-03/ui-spec.md §2/§7 — Closed/Cancelled render muted via the
+   shared `.status-badge--terminal` modifier (Resolved keeps the active
+   green treatment above — it isn't a terminal state, a Ticket can still
+   reopen from it). */
+.status-badge--terminal {
+  background: var(--color-page-bg);
+  border-color: var(--color-text-muted);
+  color: var(--color-text-muted);
+}
+
+/* docs/lab-03/ui-spec.md §7 — IT Priority pill, positioned right of
+   Requested Priority; dashed border distinguishes it as the IT-assigned
+   value rather than the Requester's original submission. */
+.priority-badge--it {
+  border-style: dashed;
+}
+
+/* docs/lab-03/ui-spec.md §2 — Role badge: neutral pill, never colour-coded
+   to imply rank. */
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-badge);
+  border: 1px solid var(--color-field-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ui-spec.md §5.5 — Queue Owner column: the owning user's name, or this
+   muted chip instead of a blank cell when ownerId is null. Same neutral
+   treatment as .role-badge. */
+.owner-chip--unassigned {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-badge);
+  border: 1px solid var(--color-field-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+  font-style: italic;
+  white-space: nowrap;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -283,10 +336,11 @@
 }
 
 /* ---------------------------------------------------------------------- */
-/* Requester Selection — ui-spec.md §11, §19                              */
+/* Login / Change Password — ui-spec.md §5.1, §5.2, §7                    */
+/* Centered card, unauthenticated (no app shell) — same layout for both.  */
 /* ---------------------------------------------------------------------- */
 
-.requester-select {
+.auth-screen {
   max-width: 420px;
   margin: var(--space-3xl) auto;
   padding: var(--space-xl);
@@ -297,18 +351,13 @@
   gap: var(--space-md);
 }
 
-.requester-select__dropdown {
-  height: var(--control-height);
-  padding: 0 var(--space-md);
-  border-radius: var(--radius-control);
-  border: 1px solid var(--color-field-border);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font-family: var(--font-family-base);
-  font-size: var(--font-size-body);
+.auth-screen form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
 }
 
-.requester-select__continue-btn {
+.auth-screen .btn {
   align-self: flex-start;
 }
 
@@ -755,4 +804,249 @@ textarea.field__control {
   border: 1px solid var(--color-field-border);
   border-radius: var(--radius-control);
   background: var(--color-page-bg);
+}
+
+.ticket-detail__resolve-indication {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xs);
+}
+
+/* docs/lab-03/ui-spec.md §5.6, §7 — IT Staff Operations panel (Owner/IT
+   Priority/Status). Owner/IT Priority controls use the shared editable
+   .field__control styling (vs. the read-only fields above); .owner-select
+   and .status-select exist as hooks for that ui-spec class table, no
+   distinct look of their own beyond .field__control. */
+.ticket-ops-panel {
+  padding: var(--space-xl);
+  background: var(--color-surface);
+  border-radius: var(--radius-control);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* docs/lab-03/ui-spec.md §5.6, §7 — confirms a Status change to Cancelled/
+   Closed before the request is sent; same structure as Lab 2's
+   .attachment-remove-confirm, kept as its own class since it confirms a
+   different action. */
+.confirm-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-page-bg);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Public Comments — docs/lab-03/ui-spec.md §3, §19                       */
+/* ---------------------------------------------------------------------- */
+
+.comment-panel {
+  padding: var(--space-xl);
+  border-radius: var(--radius-control);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.comment-panel--public {
+  background: var(--color-pale-green);
+  border: 1px solid var(--color-secondary-green);
+}
+
+/* docs/lab-03/ui-spec.md §3, §7 — visually distinct from Public Comments'
+   green (restricted/internal-only content gets the warning palette, not a
+   second shade of the same green). */
+.comment-panel--internal {
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+}
+
+.comment-tabs {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.comment-panel__header {
+  margin: 0;
+  font-weight: 600;
+}
+
+.comment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.comment-entry {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.comment-entry__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+
+.comment-entry__author {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.comment-entry__body {
+  margin: var(--space-xs) 0 0;
+  white-space: pre-wrap;
+}
+
+.comment-compose {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  align-items: flex-start;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Administrator User Management — ui-spec.md §5.7, §7                    */
+/* ---------------------------------------------------------------------- */
+
+.user-management {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.user-management__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  align-items: center;
+}
+
+/* ui-spec.md §5.7 — Active pill; Inactive reuses `.status-badge--terminal`
+   directly (same muted treatment as a Closed/Cancelled Ticket Status). */
+.badge--user-active {
+  background: var(--color-pale-green);
+  border-color: var(--color-secondary-green);
+  color: var(--color-secondary-green);
+}
+
+.user-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.user-table th,
+.user-table td {
+  padding: var(--space-sm) var(--space-md);
+  text-align: left;
+  border-bottom: 1px solid var(--color-field-border);
+  font-size: var(--font-size-body);
+}
+
+.user-card-list {
+  display: none;
+}
+
+.user-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-lg);
+  border: 1px solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.user-card__header-row,
+.user-card__footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.user-card__name {
+  font-weight: 600;
+}
+
+@media (max-width: 767px) {
+  .user-table {
+    display: none;
+  }
+
+  .user-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+}
+
+/* ui-spec.md §5.7 — Create/Edit panel, rendered inline below the toolbar
+   rather than a true modal (kept simple per specification.md §3 "small"). */
+.user-form-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-xl);
+  background: var(--color-surface);
+  border-radius: var(--radius-control);
+}
+
+.user-form-panel__row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-lg);
+}
+
+@media (max-width: 767px) {
+  .user-form-panel__row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.user-form-panel__actions {
+  display: flex;
+  gap: var(--space-md);
+}
+
+/* ui-spec.md §5.7 — "Set New Initial Password" sub-panel: a separate,
+   explicit action (BR-31), never sharing a form with name/email/role/active
+   edits. Reuses .confirm-dialog's structure since both are a small
+   focused control inline below their trigger. */
+.password-reset-subpanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-page-bg);
+}
+
+/* ui-spec.md §5.7 — self-deactivation/last-Administrator protection message,
+   shown next to the disabled Active toggle (BR-25/BR-26; the disabled state
+   is UI convenience, the server check is authoritative). */
+.user-form-panel__active-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
 }

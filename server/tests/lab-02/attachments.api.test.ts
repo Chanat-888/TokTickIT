@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
+import { sessionCookieFor } from "../authHelpers.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const serverRoot = path.join(__dirname, "..", "..");
@@ -17,7 +18,7 @@ const { UPLOADS_DIR } = await import("../../src/uploads.js");
 
 async function truncateAll() {
   await getPrisma().$executeRawUnsafe(
-    `TRUNCATE TABLE "Attachment", "Ticket", "RequesterUser", "RelatedSystem", "Category" RESTART IDENTITY CASCADE;`,
+    `TRUNCATE TABLE "Attachment", "Ticket", "User", "RelatedSystem", "Category" RESTART IDENTITY CASCADE;`,
   );
 }
 
@@ -30,7 +31,9 @@ async function seedRelatedSystem(name: string, isActive = true) {
 }
 
 async function seedRequester(name: string, email: string, isActive = true) {
-  return getPrisma().requesterUser.create({ data: { name, email, isActive } });
+  return getPrisma().user.create({
+    data: { name, email, isActive, passwordHash: "unused-in-lab2-tests", role: "REQUESTER", mustChangePassword: false },
+  });
 }
 
 async function seedTicket(params: {
@@ -47,6 +50,7 @@ async function seedTicket(params: {
       summary: "Laptop won't power on after firmware update",
       description: "Default description long enough for validation purposes.",
       requestedPriority: "HIGH",
+      itPriority: "HIGH",
       status: "NEW",
       idempotencyKey: randomUUID(),
     },
@@ -151,7 +155,7 @@ describe("Attachments", () => {
 
     const res = await request(app)
       .post(`/api/tickets/${ticket.id}/attachments`)
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .attach("files", pngBuffer(1024), { filename: "photo.png", contentType: "image/png" });
 
     expect(res.status).toBe(201);
@@ -181,7 +185,7 @@ describe("Attachments", () => {
 
     const res = await request(app)
       .post(`/api/tickets/${ticket.id}/attachments`)
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .attach("files", pngBuffer(1024), { filename: "new.png", contentType: "image/png" });
 
     expect(res.status).toBe(409);
@@ -200,7 +204,7 @@ describe("Attachments", () => {
       relatedSystemId: relatedSystem.id,
     });
 
-    let req = request(app).post(`/api/tickets/${ticket.id}/attachments`).set("X-Requester-Id", String(requester.id));
+    let req = request(app).post(`/api/tickets/${ticket.id}/attachments`).set("Cookie", await sessionCookieFor(requester.id));
     for (let i = 0; i < 6; i++) {
       req = req.attach("files", pngBuffer(1024), { filename: `f${i}.png`, contentType: "image/png" });
     }
@@ -224,7 +228,7 @@ describe("Attachments", () => {
 
     const res = await request(app)
       .post(`/api/tickets/${ticket.id}/attachments`)
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .attach("files", Buffer.from("hello"), { filename: "note.txt", contentType: "text/plain" });
 
     expect(res.status).toBe(415);
@@ -245,7 +249,7 @@ describe("Attachments", () => {
 
     const res = await request(app)
       .post(`/api/tickets/${ticket.id}/attachments`)
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .attach("files", pngBuffer(5 * 1024 * 1024 + 1), { filename: "big.png", contentType: "image/png" });
 
     expect(res.status).toBe(413);
@@ -264,7 +268,7 @@ describe("Attachments", () => {
       relatedSystemId: relatedSystem.id,
     });
 
-    let req = request(app).post(`/api/tickets/${ticket.id}/attachments`).set("X-Requester-Id", String(requester.id));
+    let req = request(app).post(`/api/tickets/${ticket.id}/attachments`).set("Cookie", await sessionCookieFor(requester.id));
     for (let i = 0; i < 4; i++) {
       req = req.attach("files", pngBuffer(1024), { filename: `good-${i}.png`, contentType: "image/png" });
     }
@@ -289,7 +293,7 @@ describe("Attachments", () => {
       relatedSystemId: relatedSystem.id,
     });
 
-    let req = request(app).post(`/api/tickets/${ticket.id}/attachments`).set("X-Requester-Id", String(requester.id));
+    let req = request(app).post(`/api/tickets/${ticket.id}/attachments`).set("Cookie", await sessionCookieFor(requester.id));
     for (let i = 0; i < 4; i++) {
       req = req.attach("files", pngBuffer(1024), { filename: `good-${i}.png`, contentType: "image/png" });
     }
@@ -309,7 +313,7 @@ describe("Attachments", () => {
     // rather than 404ing on the ownership lookup.
     const res = await request(app)
       .post("/api/tickets/999999/attachments")
-      .set("X-Requester-Id", String(requester.id));
+      .set("Cookie", await sessionCookieFor(requester.id));
 
     expect(res.status).toBe(400);
     expect(res.body.errors).toEqual(
@@ -323,7 +327,7 @@ describe("Attachments", () => {
 
     const res = await request(app)
       .post("/api/tickets/999999/attachments")
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .attach("files", pngBuffer(1024), { filename: "photo.png", contentType: "image/png" });
 
     expect(res.status).toBe(404);
@@ -343,7 +347,7 @@ describe("Attachments", () => {
 
     const res = await request(app)
       .post(`/api/tickets/${ticket.id}/attachments`)
-      .set("X-Requester-Id", String(other.id))
+      .set("Cookie", await sessionCookieFor(other.id))
       .attach("files", pngBuffer(1024), { filename: "photo.png", contentType: "image/png" });
 
     expect(res.status).toBe(404);
@@ -364,7 +368,7 @@ describe("Attachments", () => {
 
     const res = await request(app)
       .get(`/api/tickets/${ticket.id}/attachments/${attachment.id}`)
-      .set("X-Requester-Id", String(requester.id));
+      .set("Cookie", await sessionCookieFor(requester.id));
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
@@ -397,7 +401,7 @@ describe("Attachments", () => {
 
     const res = await request(app)
       .get(`/api/tickets/${ticket.id}/attachments/${attachment.id}`)
-      .set("X-Requester-Id", String(requester.id));
+      .set("Cookie", await sessionCookieFor(requester.id));
 
     expect(res.status).toBe(200);
     expect(res.body.isRemoved).toBe(true);
@@ -411,7 +415,7 @@ describe("Attachments", () => {
 
     const res = await request(app)
       .get("/api/tickets/1/attachments/999999")
-      .set("X-Requester-Id", String(requester.id));
+      .set("Cookie", await sessionCookieFor(requester.id));
 
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ error: "Not found" });
@@ -431,7 +435,7 @@ describe("Attachments", () => {
 
     const res = await request(app)
       .get(`/api/tickets/${ticket.id}/attachments/${attachment.id}`)
-      .set("X-Requester-Id", String(other.id));
+      .set("Cookie", await sessionCookieFor(other.id));
 
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ error: "Not found" });
@@ -455,7 +459,7 @@ describe("Attachments", () => {
 
     const res = await request(app)
       .get(`/api/tickets/${ticket.id}/attachments/${attachment.id}/download`)
-      .set("X-Requester-Id", String(requester.id));
+      .set("Cookie", await sessionCookieFor(requester.id));
 
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toContain("text/plain");
@@ -477,7 +481,7 @@ describe("Attachments", () => {
 
     const res = await request(app)
       .get(`/api/tickets/${ticket.id}/attachments/${attachment.id}/download`)
-      .set("X-Requester-Id", String(requester.id));
+      .set("Cookie", await sessionCookieFor(requester.id));
 
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ error: "Not found" });
@@ -499,50 +503,10 @@ describe("Attachments", () => {
 
     const res = await request(app)
       .get(`/api/tickets/${ticket.id}/attachments/${attachment.id}/download`)
-      .set("X-Requester-Id", String(other.id));
+      .set("Cookie", await sessionCookieFor(other.id));
 
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ error: "Not found" });
-  });
-
-  // Deviation coverage (api-spec.md §9, Issue #21 TASK 2/4): a plain <a>
-  // link click can't carry a custom header, so this route also accepts a
-  // requesterId query param, with the header taking precedence when present.
-  it("GET .../download accepts a requesterId query param when X-Requester-Id is absent", async () => {
-    const category = await seedCategory("Hardware");
-    const relatedSystem = await seedRelatedSystem("Email");
-    const requester = await seedRequester("Alex Rivera", "alex@example.com");
-    const ticket = await seedTicket({
-      requesterId: requester.id,
-      categoryId: category.id,
-      relatedSystemId: relatedSystem.id,
-    });
-    const attachment = await seedAttachmentWithFile({ ticketId: ticket.id });
-
-    const res = await request(app).get(
-      `/api/tickets/${ticket.id}/attachments/${attachment.id}/download?requesterId=${requester.id}`,
-    );
-
-    expect(res.status).toBe(200);
-  });
-
-  it("GET .../download prefers the X-Requester-Id header over a requesterId query param when both are present", async () => {
-    const category = await seedCategory("Hardware");
-    const relatedSystem = await seedRelatedSystem("Email");
-    const owner = await seedRequester("Alex Rivera", "alex@example.com");
-    const other = await seedRequester("Sam Okafor", "sam@example.com");
-    const ticket = await seedTicket({
-      requesterId: owner.id,
-      categoryId: category.id,
-      relatedSystemId: relatedSystem.id,
-    });
-    const attachment = await seedAttachmentWithFile({ ticketId: ticket.id });
-
-    const res = await request(app)
-      .get(`/api/tickets/${ticket.id}/attachments/${attachment.id}/download?requesterId=${owner.id}`)
-      .set("X-Requester-Id", String(other.id));
-
-    expect(res.status).toBe(404);
   });
 
   it("GET .../download returns the generic 500 when the DB row exists but the file is missing from disk", async () => {
@@ -558,7 +522,7 @@ describe("Attachments", () => {
 
     const res = await request(app)
       .get(`/api/tickets/${ticket.id}/attachments/${attachment.id}/download`)
-      .set("X-Requester-Id", String(requester.id));
+      .set("Cookie", await sessionCookieFor(requester.id));
 
     expect(res.status).toBe(500);
     expect(res.body).toEqual({ error: "Unexpected server error" });
@@ -578,7 +542,7 @@ describe("Attachments", () => {
 
     const res = await request(app)
       .delete(`/api/tickets/${ticket.id}/attachments/${attachment.id}`)
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .send({ reason: "Duplicate of another attached screenshot" });
 
     expect(res.status).toBe(200);
@@ -591,7 +555,7 @@ describe("Attachments", () => {
 
     const metaRes = await request(app)
       .get(`/api/tickets/${ticket.id}/attachments/${attachment.id}`)
-      .set("X-Requester-Id", String(requester.id));
+      .set("Cookie", await sessionCookieFor(requester.id));
     expect(metaRes.status).toBe(200);
     expect(metaRes.body.isRemoved).toBe(true);
 
@@ -616,7 +580,7 @@ describe("Attachments", () => {
 
     const res = await request(app)
       .delete(`/api/tickets/${ticket.id}/attachments/${attachment.id}`)
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .send({});
 
     expect(res.status).toBe(200);
@@ -639,7 +603,7 @@ describe("Attachments", () => {
 
     const res = await request(app)
       .delete(`/api/tickets/${ticket.id}/attachments/${attachment.id}`)
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .send({ reason });
 
     expect(res.status).toBe(200);
@@ -660,7 +624,7 @@ describe("Attachments", () => {
 
     const res = await request(app)
       .delete(`/api/tickets/${ticket.id}/attachments/${attachment.id}`)
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .send({});
 
     expect(res.status).toBe(409);
@@ -673,7 +637,7 @@ describe("Attachments", () => {
 
     const res = await request(app)
       .delete("/api/tickets/1/attachments/999999")
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .send({});
 
     expect(res.status).toBe(404);
@@ -694,7 +658,7 @@ describe("Attachments", () => {
 
     const res = await request(app)
       .delete(`/api/tickets/${ticket.id}/attachments/${attachment.id}`)
-      .set("X-Requester-Id", String(other.id))
+      .set("Cookie", await sessionCookieFor(other.id))
       .send({});
 
     expect(res.status).toBe(404);
@@ -709,7 +673,7 @@ describe("Attachments", () => {
 
     const createRes = await request(app)
       .post("/api/tickets")
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .set("Idempotency-Key", randomUUID())
       .send({
         categoryId: category.id,
@@ -723,13 +687,13 @@ describe("Attachments", () => {
 
     const uploadRes = await request(app)
       .post(`/api/tickets/${ticketId}/attachments`)
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .attach("files", pngBuffer(6 * 1024 * 1024), { filename: "big.png", contentType: "image/png" });
     expect(uploadRes.status).toBe(413);
 
     const getRes = await request(app)
       .get(`/api/tickets/${ticketId}`)
-      .set("X-Requester-Id", String(requester.id));
+      .set("Cookie", await sessionCookieFor(requester.id));
     expect(getRes.status).toBe(200);
     expect(getRes.body.attachments).toEqual([]);
   });
@@ -749,7 +713,7 @@ describe("Attachments", () => {
 
     const res = await request(app)
       .delete(`/api/tickets/${ticket.id}/attachments/${attachment.id}`)
-      .set("X-Requester-Id", String(requester.id))
+      .set("Cookie", await sessionCookieFor(requester.id))
       .send({ reason });
 
     expect(res.status).toBe(400);

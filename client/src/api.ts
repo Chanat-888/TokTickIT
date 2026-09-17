@@ -1,5 +1,4 @@
 import { API_URL, apiFetch } from "./lib/apiClient.js";
-import { getSelectedRequester } from "./lib/requesterContext.js";
 
 export interface Category {
   id: number;
@@ -11,12 +10,34 @@ export interface RelatedSystem {
   name: string;
 }
 
-export interface Requester {
+export type Priority = "LOW" | "MEDIUM" | "HIGH";
+
+// docs/lab-03/specification.md §5 "Status transition matrix" — the full set
+// a Ticket can now reach; Requester-facing screens must be able to render
+// any of these even though only IT Staff/Administrator can set them.
+export type TicketStatus =
+  | "NEW"
+  | "OPEN"
+  | "IN_PROGRESS"
+  | "WAITING_FOR_REQUESTER"
+  | "RESOLVED"
+  | "CLOSED"
+  | "REOPENED"
+  | "CANCELLED";
+
+// docs/lab-03/api-spec.md §0.4 — never includes passwordHash or a session
+// token.
+export type Role = "REQUESTER" | "IT_STAFF" | "ADMINISTRATOR";
+export interface User {
   id: number;
   name: string;
+  email: string;
+  role: Role;
+  isActive: boolean;
+  mustChangePassword: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
-
-export type Priority = "LOW" | "MEDIUM" | "HIGH";
 
 // api-spec.md §0.3 — the shared Ticket representation.
 export interface Ticket {
@@ -28,7 +49,10 @@ export interface Ticket {
   summary: string;
   description: string;
   requestedPriority: Priority;
-  status: "NEW";
+  status: TicketStatus;
+  // docs/lab-03/api-spec.md §0.4 — the only field the Requester-facing
+  // shape gains in Lab 3.
+  requesterIndicatedResolvedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -59,21 +83,70 @@ export interface CreateTicketInput {
   requestedPriority: Priority;
 }
 
-// Issue 17 — active Development Requesters, for the Requester Selection
-// screen. No X-Requester-Id header required (api-spec.md §0.1): this is the
-// endpoint that runs before a Requester is chosen, so it deliberately uses a
-// plain fetch rather than the apiClient wrapper.
-// The timeout covers the case where the backend accepts the connection but
-// never responds — without it the screen would stay on "Loading Requesters…"
-// forever.
-export async function getRequesters(): Promise<Requester[]> {
-  const res = await fetch(`${API_URL}/api/requesters`, {
-    signal: AbortSignal.timeout(5000),
+// docs/lab-03/api-spec.md §1 — Authentication. Login uses a plain fetch
+// (not apiFetch) since there is no session yet to attach; credentials:
+// "include" still matters here so the Set-Cookie response is honored.
+export type LoginResult =
+  | { status: 200; user: User }
+  | { status: 401 | 403; error: string }
+  | { status: 400; errors: FieldError[] };
+
+export async function login(email: string, password: string): Promise<LoginResult> {
+  const res = await fetch(`${API_URL}/auth/login`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
   });
-  if (!res.ok) {
-    throw new Error(`Requesters fetch failed with status ${res.status}`);
+  if (res.status === 200) {
+    return { status: 200, user: (await res.json()) as User };
   }
-  return (await res.json()) as Requester[];
+  if (res.status === 400) {
+    const body = (await res.json()) as { errors: FieldError[] };
+    return { status: 400, errors: body.errors };
+  }
+  const body = (await res.json()) as { error: string };
+  return { status: res.status as 401 | 403, error: body.error };
+}
+
+export async function logout(): Promise<void> {
+  await apiFetch("/auth/logout", { method: "POST" });
+}
+
+// Returns null on 401 (not authenticated) rather than throwing — this is
+// the normal "am I logged in?" check on app boot, not an error condition.
+export async function getMe(): Promise<User | null> {
+  const res = await apiFetch("/auth/me");
+  if (res.status === 401) return null;
+  if (!res.ok) {
+    throw new Error(`GET /auth/me failed with status ${res.status}`);
+  }
+  return (await res.json()) as User;
+}
+
+export type ChangePasswordResult =
+  | { status: 200; user: User }
+  | { status: 401; error: string }
+  | { status: 400; errors: FieldError[] };
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<ChangePasswordResult> {
+  const res = await apiFetch("/auth/change-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  if (res.status === 200) {
+    return { status: 200, user: (await res.json()) as User };
+  }
+  if (res.status === 400) {
+    const body = (await res.json()) as { errors: FieldError[] };
+    return { status: 400, errors: body.errors };
+  }
+  const body = (await res.json()) as { error: string };
+  return { status: 401, error: body.error };
 }
 
 // Issue 18 — active Categories, for the Create Ticket category dropdown. No
@@ -227,20 +300,155 @@ export async function getAttachment(ticketId: number, attachmentId: number): Pro
 
 // Issue 21 — builds the absolute download URL (api-spec.md §9), used as a
 // plain <a href> so the file opens/downloads directly in the browser rather
-// than being fetched-then-blobbed (BR-35). A plain link navigation can't
-// carry the X-Requester-Id header apiFetch normally attaches, so — as a
-// deviation scoped to this one endpoint only — the requester id is appended
-// as a `requesterId` query param instead; the server route accepts either
-// (api-spec.md §9, TASK 4 of Issue #21).
+// than being fetched-then-blobbed (BR-35). The session cookie is sent
+// automatically on same-site navigation (SameSite=Lax), so — unlike Lab 2's
+// X-Requester-Id header — no id needs to be appended to the URL.
 export function downloadAttachmentUrl(ticketId: number, attachmentId: number): string {
-  const requester = getSelectedRequester();
-  const query = requester ? `?requesterId=${requester.id}` : "";
-  return `${API_URL}/api/tickets/${ticketId}/attachments/${attachmentId}/download${query}`;
+  return `${API_URL}/api/tickets/${ticketId}/attachments/${attachmentId}/download`;
 }
 
 // Issue 21 — thrown by removeAttachment on a 409, so the UI can show a
 // specific "already removed" message if that race occurs.
 export class AlreadyRemovedError extends Error {}
+
+// api-spec.md §0.4 — the staff view adds itPriority and ownerId on top of
+// the Requester-facing Ticket shape.
+export interface StaffTicket extends Ticket {
+  itPriority: Priority;
+  ownerId: number | null;
+}
+
+export interface StaffTicketListResult {
+  data: StaffTicket[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface StaffTicketListParams {
+  search?: string;
+  status?: TicketStatus;
+  itPriority?: Priority;
+  ownerId?: number | "unassigned";
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+  page?: number;
+  pageSize?: number;
+}
+
+// Issue 40 — IT Staff Ticket Queue (api-spec.md §3). Every control on this
+// screen only ever sends values it itself defined, so — like getTickets —
+// a non-2xx status is thrown rather than returned as form data.
+export async function getStaffTickets(params: StaffTicketListParams): Promise<StaffTicketListResult> {
+  const query = new URLSearchParams();
+  if (params.search !== undefined) query.set("search", params.search);
+  if (params.status !== undefined) query.set("status", params.status);
+  if (params.itPriority !== undefined) query.set("itPriority", params.itPriority);
+  if (params.ownerId !== undefined) query.set("ownerId", String(params.ownerId));
+  if (params.sortBy !== undefined) query.set("sortBy", params.sortBy);
+  if (params.sortDir !== undefined) query.set("sortDir", params.sortDir);
+  if (params.page !== undefined) query.set("page", String(params.page));
+  if (params.pageSize !== undefined) query.set("pageSize", String(params.pageSize));
+
+  const qs = query.toString();
+  const res = await apiFetch(`/api/staff/tickets${qs ? `?${qs}` : ""}`);
+  if (!res.ok) {
+    throw new Error(`Staff tickets fetch failed with status ${res.status}`);
+  }
+  return (await res.json()) as StaffTicketListResult;
+}
+
+// api-spec.md §3 — active IT Staff/Administrator users, for resolving a
+// Ticket's ownerId to a display name on the Queue (the staff Ticket
+// representation carries only the id).
+export interface AssignableUser {
+  id: number;
+  name: string;
+  role: Role;
+}
+
+export async function getAssignableUsers(): Promise<AssignableUser[]> {
+  const res = await apiFetch("/api/staff/assignable-users");
+  if (!res.ok) {
+    throw new Error(`Assignable users fetch failed with status ${res.status}`);
+  }
+  const body = (await res.json()) as { data: AssignableUser[] };
+  return body.data;
+}
+
+// Issue 41 — IT Staff Ticket Detail (api-spec.md §3): staff view plus
+// attachments/comments/notes.
+export interface StaffTicketDetail extends StaffTicket {
+  attachments: Attachment[];
+  comments: Comment[];
+  notes: Comment[];
+}
+
+export async function getStaffTicket(id: number): Promise<StaffTicketDetail> {
+  const res = await apiFetch(`/api/staff/tickets/${id}`);
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  if (!res.ok) {
+    throw new Error(`Staff ticket fetch failed with status ${res.status}`);
+  }
+  return (await res.json()) as StaffTicketDetail;
+}
+
+// BR-18: null unassigns; any other value claims/(re)assigns.
+export async function setTicketOwner(ticketId: number, ownerId: number | null): Promise<StaffTicket> {
+  const res = await apiFetch(`/api/staff/tickets/${ticketId}/owner`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ownerId }),
+  });
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  if (!res.ok) {
+    throw new Error(`Set owner failed with status ${res.status}`);
+  }
+  return (await res.json()) as StaffTicket;
+}
+
+export async function setTicketItPriority(ticketId: number, itPriority: Priority): Promise<StaffTicket> {
+  const res = await apiFetch(`/api/staff/tickets/${ticketId}/it-priority`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ itPriority }),
+  });
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  if (!res.ok) {
+    throw new Error(`Set IT priority failed with status ${res.status}`);
+  }
+  return (await res.json()) as StaffTicket;
+}
+
+// BR-19: thrown on 409 so the UI can surface the specific message — the
+// Status select only ever offers legal targets, so this is a defensive
+// fallback (e.g. a stale screen) rather than the normal path.
+export class StatusTransitionError extends Error {}
+
+export async function setTicketStatus(ticketId: number, status: TicketStatus): Promise<StaffTicket> {
+  const res = await apiFetch(`/api/staff/tickets/${ticketId}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  if (res.status === 409) {
+    throw new StatusTransitionError("Status transition not permitted");
+  }
+  if (!res.ok) {
+    throw new Error(`Set status failed with status ${res.status}`);
+  }
+  return (await res.json()) as StaffTicket;
+}
 
 // Issue 21 — soft-remove an Attachment (api-spec.md §10, BR-31/BR-34).
 export async function removeAttachment(
@@ -260,4 +468,198 @@ export async function removeAttachment(
     throw new Error(`Attachment removal failed with status ${res.status}`);
   }
   return (await res.json()) as Attachment;
+}
+
+// api-spec.md §0.4 — shared shape for PublicComment and InternalNote rows.
+export interface Comment {
+  id: number;
+  ticketId: number;
+  authorId: number;
+  authorName: string;
+  authorRole: Role;
+  body: string;
+  createdAt: string;
+}
+
+// Issue 39 — Public Comments on Ticket Detail (api-spec.md §2, FR-07).
+export async function getComments(ticketId: number): Promise<Comment[]> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/comments`);
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  if (!res.ok) {
+    throw new Error(`Comments fetch failed with status ${res.status}`);
+  }
+  const body = (await res.json()) as { data: Comment[] };
+  return body.data;
+}
+
+export async function postComment(ticketId: number, body: string): Promise<Comment> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/comments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ body }),
+  });
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  if (!res.ok) {
+    throw new Error(`Post comment failed with status ${res.status}`);
+  }
+  return (await res.json()) as Comment;
+}
+
+// Issue 39 — "Problem Appears Resolved" (api-spec.md §2, FR-08, BR-24).
+export async function resolveIndication(ticketId: number): Promise<Ticket> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/resolve-indication`, {
+    method: "POST",
+  });
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  if (!res.ok) {
+    throw new Error(`Resolve indication failed with status ${res.status}`);
+  }
+  return (await res.json()) as Ticket;
+}
+
+// Issue 41 — Internal Notes (api-spec.md §3): same shape/validation as
+// Comments, scoped to InternalNote and IT Staff/Administrator only.
+export async function getNotes(ticketId: number): Promise<Comment[]> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/notes`);
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  if (!res.ok) {
+    throw new Error(`Notes fetch failed with status ${res.status}`);
+  }
+  const body = (await res.json()) as { data: Comment[] };
+  return body.data;
+}
+
+export async function postNote(ticketId: number, body: string): Promise<Comment> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/notes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ body }),
+  });
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  if (!res.ok) {
+    throw new Error(`Post note failed with status ${res.status}`);
+  }
+  return (await res.json()) as Comment;
+}
+
+// ---------------------------------------------------------------------------
+// Issue 42 — Administrator User Management (api-spec.md §4).
+// ---------------------------------------------------------------------------
+
+export interface AdminUserListParams {
+  search?: string;
+  role?: Role;
+}
+
+export async function getAdminUsers(params: AdminUserListParams): Promise<User[]> {
+  const query = new URLSearchParams();
+  if (params.search !== undefined) query.set("search", params.search);
+  if (params.role !== undefined) query.set("role", params.role);
+
+  const qs = query.toString();
+  const res = await apiFetch(`/api/admin/users${qs ? `?${qs}` : ""}`);
+  if (!res.ok) {
+    throw new Error(`Admin users fetch failed with status ${res.status}`);
+  }
+  const body = (await res.json()) as { data: User[] };
+  return body.data;
+}
+
+export interface CreateUserInput {
+  name: string;
+  email: string;
+  role: Role;
+  isActive: boolean;
+  initialPassword: string;
+}
+
+export type CreateUserResult =
+  | { status: 201; user: User }
+  | { status: 400; errors: FieldError[] }
+  | { status: 409; error: string };
+
+export async function createUser(input: CreateUserInput): Promise<CreateUserResult> {
+  const res = await apiFetch("/api/admin/users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (res.status === 201) {
+    return { status: 201, user: (await res.json()) as User };
+  }
+  if (res.status === 400) {
+    const body = (await res.json()) as { errors: FieldError[] };
+    return { status: 400, errors: body.errors };
+  }
+  if (res.status === 409) {
+    const body = (await res.json()) as { error: string };
+    return { status: 409, error: body.error };
+  }
+  throw new Error(`Create user failed with status ${res.status}`);
+}
+
+export interface UpdateUserInput {
+  name?: string;
+  email?: string;
+  role?: Role;
+  isActive?: boolean;
+}
+
+export type UpdateUserResult =
+  | { status: 200; user: User }
+  | { status: 400; errors: FieldError[] }
+  | { status: 409; error: string };
+
+export async function updateUser(id: number, input: UpdateUserInput): Promise<UpdateUserResult> {
+  const res = await apiFetch(`/api/admin/users/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (res.status === 200) {
+    return { status: 200, user: (await res.json()) as User };
+  }
+  if (res.status === 400) {
+    const body = (await res.json()) as { errors: FieldError[] };
+    return { status: 400, errors: body.errors };
+  }
+  if (res.status === 409) {
+    const body = (await res.json()) as { error: string };
+    return { status: 409, error: body.error };
+  }
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  throw new Error(`Update user failed with status ${res.status}`);
+}
+
+export type SetUserPasswordResult = { status: 200; user: User } | { status: 400; errors: FieldError[] };
+
+export async function setUserPassword(id: number, newPassword: string): Promise<SetUserPasswordResult> {
+  const res = await apiFetch(`/api/admin/users/${id}/password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ newPassword }),
+  });
+  if (res.status === 200) {
+    return { status: 200, user: (await res.json()) as User };
+  }
+  if (res.status === 400) {
+    const body = (await res.json()) as { errors: FieldError[] };
+    return { status: 400, errors: body.errors };
+  }
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  throw new Error(`Set user password failed with status ${res.status}`);
 }

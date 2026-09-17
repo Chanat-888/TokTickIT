@@ -10,7 +10,7 @@ import {
   type RelatedSystem,
   type Ticket,
 } from "../api.js";
-import { useRequester } from "../lib/requesterContext.js";
+import { useAuth } from "../lib/authContext.js";
 import { getAttachmentError } from "../lib/attachmentValidation.js";
 import Field from "../components/Field.js";
 import AttachmentPicker from "../components/AttachmentPicker.js";
@@ -47,7 +47,7 @@ function validate(
 }
 
 export default function CreateTicketForm() {
-  const { requester } = useRequester();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -187,7 +187,7 @@ export default function CreateTicketForm() {
             <input type="text" value={ticketDateDisplay} readOnly />
           </Field>
           <Field label="Requester" htmlFor="ticket-requester" readOnly>
-            <input type="text" value={requester?.name ?? ""} readOnly />
+            <input type="text" value={user?.name ?? ""} readOnly />
           </Field>
         </div>
 
