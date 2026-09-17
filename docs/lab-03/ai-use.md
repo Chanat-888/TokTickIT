@@ -4,8 +4,8 @@
 for file edits, running tests, and git/GitHub operations. Unlike Lab 2,
 Lab 3 regularly ran multiple Claude Code windows concurrently against the
 same repo — one doing feature work, sometimes another reviewing PRs on
-Snooker's behalf (tracked separately in `docs/lab-03/reviewer.md`, not
-this file). Handoff documents (written to the OS temp directory, not the
+Snooker's behalf, tracked in that session's own review log rather than
+this file. Handoff documents (written to the OS temp directory, not the
 repo) were the mechanism for passing an in-progress session to a fresh
 window; several prompts below are moments from that handoff/pickup cycle
 or from reconciling two windows' concurrent state.
