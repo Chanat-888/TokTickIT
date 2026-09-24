@@ -109,8 +109,8 @@ client resending the full representation it just received is expected).
   belong to the given Ticket.
 
 This endpoint never touches `Ticket.updatedAt` (BR-14) and never checks
-`expectedUpdatedAt` — the concurrency check in §2 is scoped to the Ticket's
-own fields only (specification.md §11.7).
+`expectedUpdatedAt` — the concurrency check in §2 applies only to Ticket
+Status/Owner/IT Priority writes (specification.md §11.7).
 
 ## 2. Ticket workflow — concurrency addition
 
@@ -127,18 +127,28 @@ Check order on each of these three endpoints:
 1. Authentication (§0, unchanged) — `401`.
 2. Role check (§0, unchanged) — `403`.
 3. Ticket existence — `404`.
-4. **New**: `expectedUpdatedAt` compared to the Ticket's current
-   `updatedAt`. Mismatch → `409` (BR-17, §0.1) with body
-   `{ "error": "This ticket was changed by someone else. Refresh and try again.", "current": Ticket }` — `current` is the fresh Ticket
-   representation (staff view), so the client can update its view without
-   a second round trip.
-5. Endpoint-specific validation (e.g. status-transition legality for the
-   status endpoint) — unchanged `400`/`409` behavior from lab-03.
-6. Write applied; `200` with the updated Ticket representation.
+4. Endpoint-specific validation against the Ticket as read (e.g. status-
+   transition legality for the status endpoint) — unchanged `400`/`409`
+   behavior from lab-03. An illegal transition is reported as
+   "Status transition not permitted", not as a stale-write conflict.
+5. **New — atomic conditional write** (BR-17, specification.md §11.15):
+   the write is a single `updateMany` with `where: { id, updatedAt:
+   expectedUpdatedAt }` (the status endpoint additionally keeps its
+   existing current-status condition). `count === 0` → `409`
+   (§0.1) with body `{ "error": "This ticket was changed by someone else. Refresh and try again.", "current": Ticket }` — `current` is the
+   freshly re-read Ticket representation (staff view), so the client can
+   update its view without a second round trip. There is no separate
+   "compare, then update" step: two concurrent requests holding the same
+   `expectedUpdatedAt` cannot both succeed; exactly one write applies and
+   the other gets the 409.
+6. `count === 1` → `200` with the updated Ticket representation (new
+   `updatedAt`).
 
-A write that passes step 4 always succeeds at step 5/6 or fails on its own
-terms (e.g. illegal transition) — the concurrency check never produces a
-false negative for a caller whose `expectedUpdatedAt` is in fact current.
+Owner and it-priority previously used a plain `update`; Lab 4 changes both
+to the conditional write. Because `updatedAt` is also bumped by Attachment
+upload/removal and the Requester's resolve-indication (BR-14), a 409 here
+can be caused by those writes too; the recovery (refresh, retry with the
+new `updatedAt`) is identical.
 
 ## 3. Dashboard endpoints
 

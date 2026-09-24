@@ -49,6 +49,12 @@ implementation PRs — the submission requires evidence of that ordering.
   Issue it closes (`Closes #N` / `Fixes #N`), so the Issue auto-closes on
   merge and the link is traceable both directions — required for Part 1
   grading evidence (Kanban + linked PRs).
+- **Every PR checklist** (do all, every time, right after `gh pr create`):
+  request a reviewer (`gh pr edit N --add-reviewer ShitheadQuin`), assign
+  the PR and its Issue to Chanat-888, and comment on the Issue linking the
+  PR. `Closes #N` does NOT auto-link when the base is `lab4-staging`
+  (non-default branch), so close the Issue manually after the reviewer
+  merges. Only the final `lab4-staging` → `main` PR auto-closes via keyword.
 - **Who merges**: the agent opens PRs but never clicks merge — merging is
   the reviewer's action, not the author's/agent's, matching normal
   author-doesn't-merge-own-PR practice. Wait for reviewer approval and let
@@ -64,14 +70,16 @@ implementation PRs — the submission requires evidence of that ordering.
 
 ## Plan (phases / GitHub Issues)
 
-1. `feature/lab4-specs` — Spec DD (`specification.md`, `ui-spec.md`,
-   `api-spec.md`). Must land first.
+1. `feature/lab4-specs` — Spec DD + Test DD (`specification.md`,
+   `ui-spec.md`, `api-spec.md`, `tests.md` planned table). Must land
+   first; phase 6 only updates `tests.md` Final column/results.
 2. `feature/lab4-actions-foundation` — Prisma migration + seed for
    `ActionTaken`, backend CRUD + authorization, API tests.
 3. `feature/lab4-actions-ui` — Ticket Detail Actions Taken list/create/
    edit UI, component tests.
-4. `feature/lab4-ticket-workflow` — resolution gate, conflict/stale-update
-   handling, workflow tests.
+4. `feature/lab4-ticket-workflow` — confirmed transition matrix + atomic
+   `expectedUpdatedAt` conflict handling on status/owner/it-priority (no
+   resolution gate, per BR-16), workflow tests.
 5. `feature/lab4-dashboards` — Requester + IT Staff dashboard API + UI,
    dashboard tests.
 6. `feature/lab4-hardening` — full Labs 1–3 regression pass, a11y/
@@ -80,16 +88,12 @@ implementation PRs — the submission requires evidence of that ordering.
 7. `feature/lab4-reviewer`, `feature/lab4-ai-use` — `reviewer.md`,
    `ai-use.md`.
 
-## Open decisions for Spec DD (resolve in `specification.md`, don't guess silently)
+## Decisions already made for Lab 4
 
-- Does Resolved require ≥1 Action Taken? Handout doesn't mandate it —
-  default to *not required* unless told otherwise.
-- Can any active IT Staff/Admin edit an Action Taken, or only its creator?
-  Default: any active IT Staff/Admin (same pattern as Ticket ownership,
-  lab-03 BR-18).
-- Exact dashboard metric names/calculations — handout gives examples only.
-- Concurrency token: reuse `Ticket.updatedAt` (default) vs. add an
-  explicit version column.
+These were resolved in `specification.md` §11 — read that, not this list:
+Resolved needs no Action Taken (BR-16), any active staff may edit (BR-10),
+dashboard metrics fixed in BR-20/21, concurrency reuses `Ticket.updatedAt`
+via an atomic conditional write (BR-17, §11.15).
 
 ## Submission format
 

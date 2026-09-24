@@ -166,8 +166,13 @@ the reasons given):
   returns the original Action Taken instead of creating a duplicate — the
   same mechanism Tickets already use for creation (lab-02 schema).
 - BR-14 Creating or updating an Action Taken never modifies the parent
-  Ticket's `updatedAt` — the Ticket's concurrency token (BR-17) reflects
-  only direct changes to the Ticket's own fields.
+  Ticket's `updatedAt`. The Ticket's concurrency token (BR-17) changes on
+  every write to the Ticket row itself: Status, Owner, IT Priority, the
+  Requester's resolve-indication (lab-03 BR-24), and Attachment upload/
+  soft-removal (lab-02 BR-39, unchanged in Lab 4). A stale-write 409 can
+  therefore also be caused by one of those writes, not only by another
+  staff member's workflow change; the client recovers the same way
+  (refresh, retry).
 - BR-15 The Lab 3 status-transition matrix and its role restriction
   (lab-03 §5, BR-19) are confirmed unchanged and final for Lab 4: Status
   may be changed only by IT Staff/Administrator, only via the dedicated
@@ -182,7 +187,9 @@ the reasons given):
 - BR-17 A write that changes a Ticket's Status, Owner, or IT Priority must
   include the caller's last-known `Ticket.updatedAt` as `expectedUpdatedAt`;
   if it no longer matches the Ticket's current `updatedAt`, the write is
-  rejected with 409 and not applied (§6.1 of the handout).
+  rejected with 409 and not applied (§6.1 of the handout). The comparison
+  and the write are one atomic conditional update (§11.15), never a
+  separate check followed by an update.
 - BR-18 A Requester's "Problem Appears Resolved" indication (lab-03 BR-24)
   remains advisory only and never changes Status, unchanged from Lab 3.
 - BR-19 Requester Dashboard data is scoped exclusively to Tickets where
@@ -427,6 +434,15 @@ value (BR-27).
 - AC-16 Given all Lab 1-3 automated tests, when the Lab 4 test suite runs
   against `main`, then they continue to pass unmodified in behavior
   (regression, FR-12).
+- AC-17 Given IT Staff holding a Ticket at `updatedAt` T, when the
+  Requester uploads an Attachment (bumping `updatedAt`) and IT Staff then
+  submits a status change with `expectedUpdatedAt = T`, then 409 is
+  returned with the fresh Ticket in `current`, and a retry using it
+  succeeds (BR-14).
+- AC-18 Given Tickets in several statuses, when `GET /api/staff/tickets?
+  status=NEW,OPEN` is requested, then only New and Open Tickets are
+  returned, a single-value `status` behaves as before, and an invalid
+  token in the list returns 400 (BR-27).
 
 ## 10. Definition of Done
 
@@ -486,10 +502,12 @@ Meaningful choices not already fixed by the handout, each with its reason:
    version token (`expectedUpdatedAt` in the request body) instead of
    adding a new integer version column — `updatedAt` already changes on
    every Ticket write and needs no migration.
-6. Action Taken create/update never bumps `Ticket.updatedAt` — keeping the
-   concurrency token scoped to the Ticket's own fields avoids an Action
-   Taken edit accidentally invalidating another user's in-flight Ticket
-   status change.
+6. Action Taken create/update never bumps `Ticket.updatedAt` — an Action
+   Taken edit must not invalidate another user's in-flight Ticket status
+   change. Attachment upload/removal and resolve-indication still bump it
+   (lab-02 BR-39, lab-03 BR-24 are left unchanged to avoid Lab 2/3
+   regressions), so a Requester attaching a file can cause a staff 409;
+   accepted as a safe, recoverable false-positive (BR-14).
 7. The concurrency check (BR-17) applies only to Ticket Status/Owner/IT
    Priority writes, not to Action Taken updates — the handout's §6.1
    conflict requirement is stated specifically for "Ticket Resolution and
@@ -524,3 +542,8 @@ Meaningful choices not already fixed by the handout, each with its reason:
     Tickets" needs several statuses at once, and extending the parameter
     keeps one query mechanism instead of two that would need to stay in
     sync.
+15. Ticket writes under BR-17 use a single conditional write (`updateMany`
+    with `where: { id, updatedAt: expectedUpdatedAt }`, `count === 0` →
+    409) on all three endpoints, not check-then-update, so two concurrent
+    requests cannot both pass the check. The status endpoint already works
+    this way; owner and it-priority are brought in line.
