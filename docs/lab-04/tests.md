@@ -2,7 +2,7 @@
 
 Sources of truth, in this order: `specification.md`, `api-spec.md`,
 `ui-spec.md` (all authoritative). This document maps FR/BR/AC/UI rules onto
-concrete tests. No code is included; the test files below do not exist yet.
+concrete tests. No code is included; test files are written phase by phase (TDD).
 Every row's `Final` column is blank until its test file is written and
 passes — a row moves to Pass only when its test exists and passes on its
 feature branch, never earlier.
@@ -57,9 +57,9 @@ a test at its edge value (max passes, max+1 fails).
 
 | Test ID | Type | Requirement/AC | What It Tests | Expected Result | Automated Test File | Final |
 |---|---|---|---|---|---|---|
-| UNIT-01 | Unit | BR-05 | Description/Result validator boundaries | empty/whitespace fails; 2000 passes; 2001 fails | `server/tests/lab-04/action-validation.unit.test.ts` | |
-| UNIT-02 | Unit | BR-06, AC-03 | Follow-up rule | `followUpRequired:true` + empty note fails; true + note passes; false + note → note dropped | `server/tests/lab-04/action-validation.unit.test.ts` | |
-| UNIT-03 | Unit | BR-07 | Attachment Notes limit | 500 passes; 501 fails; absent passes | `server/tests/lab-04/action-validation.unit.test.ts` | |
+| UNIT-01 | Unit | BR-05 | Description/Result validator boundaries | empty/whitespace fails; 2000 passes; 2001 fails | `server/tests/lab-04/action-validation.unit.test.ts` | Pass |
+| UNIT-02 | Unit | BR-06, AC-03 | Follow-up rule | `followUpRequired:true` + empty note fails; true + note passes; false + note → note dropped | `server/tests/lab-04/action-validation.unit.test.ts` | Pass |
+| UNIT-03 | Unit | BR-07 | Attachment Notes limit | 500 passes; 501 fails; absent passes | `server/tests/lab-04/action-validation.unit.test.ts` | Pass |
 | UNIT-04 | Unit | BR-15 | Status-transition legality (unchanged matrix) | every pair in specification.md §5 allowed; every other pair, incl. from Cancelled, rejected | `server/tests/lab-04/action-validation.unit.test.ts` | |
 | UNIT-05 | Unit | BR-27 | `status` list parser | `NEW,OPEN` → two values; single value unchanged; unknown token → error | `server/tests/lab-04/action-validation.unit.test.ts` | |
 
@@ -69,18 +69,18 @@ a test at its edge value (max passes, max+1 fails).
 
 | Test ID | Type | Requirement/AC | What It Tests | Expected Result | Automated Test File | Final |
 |---|---|---|---|---|---|---|
-| API-01 | API | AC-01, BR-01, BR-03 | IT Staff `POST /api/tickets/:id/actions-taken` valid | 201; under correct Ticket; `performedById` = session user even if client sends another | `server/tests/lab-04/actions-taken.api.test.ts` | |
-| API-02 | API | AC-04, BR-02 | Staff B creates on a Ticket owned by Staff A | 201; Performed By = B; Ticket owner still A | `server/tests/lab-04/actions-taken.api.test.ts` | |
-| API-03 | API | AC-03, BR-06 | Create with `followUpRequired:true`, no note | 400 field error on `followUpNote`; nothing written | `server/tests/lab-04/actions-taken.api.test.ts` | |
-| API-04 | API | BR-05, BR-07 | Create with empty/oversize description, result, attachmentNotes | 400 per field | `server/tests/lab-04/actions-taken.api.test.ts` | |
-| API-05 | API | AC-05, BR-08 | Requester `POST` and `PATCH` Action Taken | 403 for both; nothing written | `server/tests/lab-04/actions-taken.api.test.ts` | |
-| API-06 | API | AC-06, BR-11, BR-12 | Owning Requester `GET` list on Ticket with 3 actions | 200; 3 items, oldest first, all fields | `server/tests/lab-04/actions-taken.api.test.ts` | |
-| API-07 | API | BR-11 | Requester `GET` list on another Requester's Ticket | 404, same body as nonexistent Ticket | `server/tests/lab-04/actions-taken.api.test.ts` | |
-| API-08 | API | AC-07, BR-13 | Same `idempotencyKey` posted twice | second returns 200 with original; one row in DB | `server/tests/lab-04/actions-taken.api.test.ts` | |
-| API-09 | API | AC-15, BR-09, BR-10 | Staff B `PATCH` description/result of Staff A's action | 200; Performed By still A; `ticketId`/`createdAt` unchanged even if sent | `server/tests/lab-04/actions-taken.api.test.ts` | |
-| API-10 | API | BR-14 | Create then update an Action Taken | parent `Ticket.updatedAt` unchanged | `server/tests/lab-04/actions-taken.api.test.ts` | |
-| API-11 | API | api-spec.md §1 | `PATCH` with actionId of another Ticket; unknown Ticket | 404 | `server/tests/lab-04/actions-taken.api.test.ts` | |
-| API-12 | API | api-spec.md §0 | Any Action Taken endpoint with no session | 401 | `server/tests/lab-04/actions-taken.api.test.ts` | |
+| API-01 | API | AC-01, BR-01, BR-03 | IT Staff `POST /api/tickets/:id/actions-taken` valid | 201; under correct Ticket; `performedById` = session user even if client sends another | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-02 | API | AC-04, BR-02 | Staff B creates on a Ticket owned by Staff A | 201; Performed By = B; Ticket owner still A | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-03 | API | AC-03, BR-06 | Create with `followUpRequired:true`, no note | 400 field error on `followUpNote`; nothing written | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-04 | API | BR-05, BR-07 | Create with empty/oversize description, result, attachmentNotes | 400 per field | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-05 | API | AC-05, BR-08 | Requester `POST` and `PATCH` Action Taken | 403 for both; nothing written | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-06 | API | AC-06, BR-11, BR-12 | Owning Requester `GET` list on Ticket with 3 actions | 200; 3 items, oldest first, all fields | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-07 | API | BR-11 | Requester `GET` list on another Requester's Ticket | 404, same body as nonexistent Ticket | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-08 | API | AC-07, BR-13 | Same `idempotencyKey` posted twice | second returns 200 with original; one row in DB | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-09 | API | AC-15, BR-09, BR-10 | Staff B `PATCH` description/result of Staff A's action | 200; Performed By still A; `ticketId`/`createdAt` unchanged even if sent | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-10 | API | BR-14 | Create then update an Action Taken | parent `Ticket.updatedAt` unchanged | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-11 | API | api-spec.md §1 | `PATCH` with actionId of another Ticket; unknown Ticket | 404 | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-12 | API | api-spec.md §0 | Any Action Taken endpoint with no session | 401 | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
 
 **ticket-workflow.api.test.ts**
 
@@ -129,8 +129,8 @@ a test at its edge value (max passes, max+1 fails).
 
 | Test ID | Type | Requirement/AC | What It Tests | Expected Result | Automated Test File | Final |
 |---|---|---|---|---|---|---|
-| API-36 | Migration | specification.md §7 | Apply Lab 4 migration on a copy of the Lab 3 DB | row counts of every pre-existing table unchanged; legacy Tickets have empty Actions Taken list | `server/tests/lab-04/migration-regression.api.test.ts` | |
-| API-37 | Migration | §5.3 of handout | Run seed twice | identical row counts; ≥1 Ticket with 0, 1, and 2+ actions; one Ticket whose owner ≠ action performer | `server/tests/lab-04/migration-regression.api.test.ts` | |
+| API-36 | Migration | specification.md §7 | Apply Lab 4 migration on a copy of the Lab 3 DB | row counts of every pre-existing table unchanged; legacy Tickets have empty Actions Taken list | `server/tests/lab-04/migration-regression.api.test.ts` | Pass |
+| API-37 | Migration | §5.3 of handout | Run seed twice | identical row counts; ≥1 Ticket with 0, 1, and 2+ actions; one Ticket whose owner ≠ action performer | `server/tests/lab-04/migration-regression.api.test.ts` | Pass |
 | API-38 | Regression | AC-16 | Lab 1-3 server suites | pass unmodified | `server/tests/lab-0{1,2,3}/*` | |
 | API-39 | Performance-smoke | BR-23 | Both dashboard endpoints on seeded DB, 20 sequential calls | each responds under 500 ms | `server/tests/lab-04/migration-regression.api.test.ts` | |
 
