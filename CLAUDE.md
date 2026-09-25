@@ -4,6 +4,45 @@ CPE 334 (Software Engineering in the Age of AI Agents) course project. A
 service-desk ticketing app built incrementally, one lab/sprint at a time.
 Read this before starting work in a new session.
 
+## MANDATORY: GitHub workflow — read `docs/GitHub_Workflow_Guide.pdf` first
+
+Course-issued guide (Thai/English, read the whole PDF at session start
+before any git/GitHub action). A previous session got these wrong; do not.
+
+- **Linking a PR to its Issue = the Development panel, not a keyword.**
+  `Closes #N` in the PR body does NOT link when the base is `lab4-staging`
+  (non-default branch); GitHub treats it as a plain mention. Right after
+  `gh pr create`, open the PR in the browser (Claude in Chrome), sidebar →
+  Development → gear → pick the Issue. Verify the sidebar says
+  "Successfully merging this pull request may close these issues" followed
+  by the Issue. "None yet" = not linked. (No API/CLI for this; use the
+  browser.) Still write `Closes #N` in the body for readability.
+- **Every PR, right after creating it**: link Issue (above), request
+  reviewer `ShitheadQuin`, assign PR and Issue to Chanat-888, label `lab-4`.
+- **Project board** "TokTickIT Individual Sprints" (user project #1),
+  columns Backlog → Specified → Started → PR Review → Fixing → Done. New
+  Issues land in Backlog; Specified only after reading the requirements;
+  Started when the feature branch exists and only for the Issue being
+  worked; PR Review once the PR is opened AND linked; Fixing while
+  addressing review changes on the same branch, then back to PR Review
+  after pushing; Done after the reviewer merges. Use `gh project item-edit`
+  (field Status, project id `PVT_kwHOCwvtGc4BfkxK`) to move cards; the
+  project auto-adds issues and moves closed ones to Done.
+- **After the reviewer merges into `lab4-staging`**: close the Issue by
+  hand (merge into a non-default branch doesn't close it) and make sure the
+  card is Done.
+- **Reviewer merges, never the author/agent.** After approval, the REVIEWER
+  clicks "Merge pull request". Do not merge PRs.
+- **Author duties**: reply to every review comment (what changed, or why
+  not); push fixes to the same branch (PR updates itself, no new PR);
+  resolve a conversation only after replying and actually fixing; never
+  accept an approval and merge silently.
+- **Docs-only work**: if the Issue's code is still in progress, put docs on
+  the same feature branch/PR. If code is already merged, use a branch named
+  `docs/<lab>-<topic>` (e.g. `docs/lab4-ai-use`) with its own PR, linked to
+  its Issue, or say "no Issue" in one line in the PR description. Even tiny
+  edits get a branch + PR; never push docs straight to `lab4-staging`.
+
 ## Current lab: Lab 4
 
 Handout: `../SE+Lab+4.pdf` (one level up, in `D:\SoftwareEng`).
@@ -45,21 +84,6 @@ implementation PRs — the submission requires evidence of that ordering.
   `lab4-staging`, entering `lab4-staging` via a peer-reviewed PR. Exactly
   **one** release PR merges `lab4-staging` → `main` at the end of the
   sprint. Never commit directly to `main` or `lab4-staging`.
-- **Issue ↔ PR linking**: every PR description must reference the GitHub
-  Issue it closes (`Closes #N` / `Fixes #N`), so the Issue auto-closes on
-  merge and the link is traceable both directions — required for Part 1
-  grading evidence (Kanban + linked PRs).
-- **Every PR checklist** (do all, every time, right after `gh pr create`):
-  request a reviewer (`gh pr edit N --add-reviewer ShitheadQuin`), assign
-  the PR and its Issue to Chanat-888, and comment on the Issue linking the
-  PR. `Closes #N` does NOT auto-link when the base is `lab4-staging`
-  (non-default branch), so close the Issue manually after the reviewer
-  merges. Only the final `lab4-staging` → `main` PR auto-closes via keyword.
-- **Who merges**: the agent opens PRs but never clicks merge — merging is
-  the reviewer's action, not the author's/agent's, matching normal
-  author-doesn't-merge-own-PR practice. Wait for reviewer approval and let
-  them merge (or explicit instruction to merge on their behalf after
-  approval is recorded).
 - PR review is logged live in `docs/lab-04/reviewer.md` as PRs happen (not
   reconstructed after) — reviewer identity, PR links, comments given/
   received, responses, approvals.
