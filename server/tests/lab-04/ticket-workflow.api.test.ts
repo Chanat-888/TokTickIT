@@ -187,6 +187,35 @@ describe("Ticket workflow: transitions and stale-write protection (BR-15..BR-18)
     expect(retry.status).toBe(200);
   });
 
+  // API-18 (removal half) — BR-39/BR-14
+  it("removing an attachment strictly advances updatedAt, so a stale staff write then gets 409", async () => {
+    const { ticket, requesterCookie, staffCookie } = await setup("IN_PROGRESS");
+    const attachment = await getPrisma().attachment.create({
+      data: {
+        ticketId: ticket.id,
+        originalFilename: "photo.png",
+        storedFilename: `${randomUUID()}.png`,
+        mimeType: "image/png",
+        sizeBytes: 1024,
+      },
+    });
+    const before = (await getPrisma().ticket.findUniqueOrThrow({ where: { id: ticket.id } })).updatedAt;
+    await new Promise((r) => setTimeout(r, 5));
+
+    const removed = await request(app)
+      .delete(`/api/tickets/${ticket.id}/attachments/${attachment.id}`)
+      .set("Cookie", requesterCookie)
+      .send({ reason: "Wrong file" });
+    expect(removed.status).toBe(200);
+
+    const after = (await getPrisma().ticket.findUniqueOrThrow({ where: { id: ticket.id } })).updatedAt;
+    expect(after.getTime()).toBeGreaterThan(before.getTime());
+
+    const stale = await priority(ticket.id, staffCookie, { itPriority: "HIGH", expectedUpdatedAt: before.toISOString() });
+    expect(stale.status).toBe(409);
+    expect(stale.body.error).toBe(CONFLICT);
+  });
+
   // API-19 — BR-17
   it("the Requester's resolve-indication also bumps updatedAt (409 then successful retry)", async () => {
     const { ticket, token, requesterCookie, staffCookie } = await setup("IN_PROGRESS");

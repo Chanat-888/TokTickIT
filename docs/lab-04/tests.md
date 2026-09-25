@@ -92,7 +92,7 @@ a test at its edge value (max passes, max+1 fails).
 | API-15 | API | BR-15, lab-03 AC-19 | Requester `PATCH` status/it-priority/owner directly | 403 | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
 | API-16 | API | AC-08, BR-17 | Two status changes, same `expectedUpdatedAt`, fired concurrently | exactly one 200, one 409 with `current` Ticket | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
 | API-17 | API | BR-17, §11.15 | Same concurrent pair on owner and on it-priority endpoints | exactly one 200, one 409 each (proves conditional write on all three) | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
-| API-18 | API | AC-17, BR-14 | Requester uploads Attachment, then staff status change with old `expectedUpdatedAt` | 409 + `current`; retry with `current.updatedAt` succeeds | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| API-18 | API | AC-17, BR-14 | Requester uploads Attachment, then staff status change with old `expectedUpdatedAt`; and removing an Attachment strictly advances `updatedAt` so a stale write gets 409 | 409 + `current`; retry with `current.updatedAt` succeeds; removal: `updatedAt` strictly greater and stale write 409 | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
 | API-19 | API | BR-17 | Same as API-18 after Requester resolve-indication | 409; retry succeeds | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
 | API-20 | API | BR-17 | Write with missing/malformed `expectedUpdatedAt` | 400 | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
 | API-21 | API | BR-18, lab-03 BR-24 | Requester resolve-indication | Status unchanged | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |

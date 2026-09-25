@@ -236,8 +236,12 @@ the reasons given):
   force unchanged except where explicitly superseded above (BR-17).
 - BR-27 The existing `status` query parameter on `GET /api/tickets`
   (lab-02) and `GET /api/staff/tickets` (lab-03) is extended to accept a
-  comma-separated list of status values (e.g. `status=NEW,OPEN`), purely
-  additive: a single value keeps behaving exactly as before. This lets a
+  comma-separated list of status values (e.g. `status=NEW,OPEN`). A single
+  value keeps behaving as before with one exception: the Requester list
+  (`GET /api/tickets`) accepted only `NEW` in Lab 2 because `NEW` was then
+  the sole status, so `status=RESOLVED` (or any non-`NEW` status) changes
+  from 400 to 200 (§11.16-17). On `GET /api/staff/tickets` a single value
+  is unchanged. This lets a
   dashboard drill-down link (BR-25) reproduce a grouped metric's (BR-20/
   BR-21) exact filter instead of approximating it.
 
@@ -435,7 +439,9 @@ value (BR-27).
   its Description and Result, then the update succeeds and Performed By
   still shows IT Staff A (BR-09/BR-10).
 - AC-16 Given all Lab 1-3 automated tests, when the Lab 4 test suite runs
-  against `main`, then they continue to pass unmodified in behavior
+  against `main`, then they continue to pass unmodified in behavior,
+  except the two superseded contracts listed in §11.17 (BR-17's required
+  `expectedUpdatedAt`, BR-27's widened Requester `status` filter)
   (regression, FR-12).
 - AC-17 Given IT Staff holding a Ticket at `updatedAt` T, when the
   Requester uploads an Attachment (bumping `updatedAt`) and IT Staff then
@@ -456,7 +462,9 @@ following hold on the final `main` branch:
   skipped.
 - All Lab 1-3 tests (`server/tests/lab-0{1,2,3}/*`, the corresponding
   `client/.../lab-0{1,2,3}` component tests, and `e2e/lab-0{1,2,3}/*`)
-  still pass unmodified in behavior, proving the regression requirement.
+  still pass unmodified in behavior, proving the regression requirement,
+  except the two tests edited for the contracts Lab 4 supersedes on purpose
+  (§11.17); every other Lab 1-3 test is untouched.
 - `server/tests/lab-04/*`, the four `client/.../lab-04` component test
   files, and `e2e/lab-04/*` all pass with zero skipped/disabled/todo
   tests, from the commands documented in `tests.md`.

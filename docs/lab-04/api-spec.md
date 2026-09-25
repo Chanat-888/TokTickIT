@@ -67,8 +67,11 @@ of the handout, BR-23):
 
 `GET /api/tickets` (lab-02) and `GET /api/staff/tickets` (lab-03) now
 accept a comma-separated list for `status`, e.g. `status=NEW,OPEN,
-IN_PROGRESS,REOPENED`. A single value behaves exactly as before (no
-behavior change for existing callers). Each comma-separated token is
+IN_PROGRESS,REOPENED`. On `GET /api/staff/tickets` a single value behaves
+exactly as before. One exception: `GET /api/tickets` (Requester) accepted
+only `NEW` in Lab 2 (the sole status then), so a single non-`NEW` value
+such as `status=RESOLVED` changes from 400 to 200 (§2.1, specification.md
+§11.17). Each comma-separated token is
 validated against the `TicketStatus` enum individually; one invalid token
 rejects the whole request with 400, same as an invalid single value did.
 
