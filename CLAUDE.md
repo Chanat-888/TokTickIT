@@ -11,14 +11,12 @@ Course-issued guide (Thai/English). The PDF lives locally in `docs/` but is
 missing, ask the user for it. Read the whole PDF at session start before any
 git/GitHub action. A previous session got these wrong; do not.
 
-- **Linking a PR to its Issue = the Development panel, not a keyword.**
+- **Linking a PR to its Issue = the Development link, not a keyword.**
   `Closes #N` in the PR body does NOT link when the base is `lab4-staging`
-  (non-default branch); GitHub treats it as a plain mention. Right after
-  `gh pr create`, open the PR in the browser (Claude in Chrome), sidebar →
-  Development → gear → pick the Issue. Verify the sidebar says
-  "Successfully merging this pull request may close these issues" followed
-  by the Issue. "None yet" = not linked. (No API/CLI for this; use the
-  browser.) Still write `Closes #N` in the body for readability.
+  (non-default branch); GitHub treats it as a plain mention. Use `link_pr`
+  (see the PR procedure below), which does what the Development-panel gear
+  does; the PR sidebar then shows the Issue under Development. Still write
+  `Closes #N` in the body for readability.
 - **PR procedure (all steps, in this order; a PR is NOT "opened" until step 4
   passes — never report it as done, and never move the card, before then):**
   1. `gh pr create --base lab4-staging --label lab-4 --reviewer ShitheadQuin
