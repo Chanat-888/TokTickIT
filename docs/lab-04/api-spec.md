@@ -67,8 +67,11 @@ of the handout, BR-23):
 
 `GET /api/tickets` (lab-02) and `GET /api/staff/tickets` (lab-03) now
 accept a comma-separated list for `status`, e.g. `status=NEW,OPEN,
-IN_PROGRESS,REOPENED`. A single value behaves exactly as before (no
-behavior change for existing callers). Each comma-separated token is
+IN_PROGRESS,REOPENED`. On `GET /api/staff/tickets` a single value behaves
+exactly as before. One exception: `GET /api/tickets` (Requester) accepted
+only `NEW` in Lab 2 (the sole status then), so a single non-`NEW` value
+such as `status=RESOLVED` changes from 400 to 200 (§2.1, specification.md
+§11.17). Each comma-separated token is
 validated against the `TicketStatus` enum individually; one invalid token
 rejects the whole request with 400, same as an invalid single value did.
 
@@ -129,11 +132,17 @@ Check order on each of these three endpoints:
 1. Authentication (§0, unchanged) — `401`.
 2. Role check (§0, unchanged) — `403`.
 3. Ticket existence — `404`.
-4. Endpoint-specific validation against the Ticket as read (e.g. status-
+4. **New — stale pre-check** (BR-17): if the Ticket just read already has
+   an `updatedAt` different from `expectedUpdatedAt`, return the stale
+   `409` (step 6 body) immediately, before anything is judged against the
+   changed state. A caller holding an out-of-date view therefore always
+   sees the stale conflict, never a misleading "transition not permitted"
+   caused by someone else's change.
+5. Endpoint-specific validation against the Ticket as read (e.g. status-
    transition legality for the status endpoint) — unchanged `400`/`409`
-   behavior from lab-03. An illegal transition is reported as
-   "Status transition not permitted", not as a stale-write conflict.
-5. **New — atomic conditional write** (BR-17, specification.md §11.15):
+   behavior from lab-03. With a current token, an illegal transition is
+   reported as "Status transition not permitted".
+6. **New — atomic conditional write** (BR-17, specification.md §11.15):
    the write is a single `updateMany` with `where: { id, updatedAt:
    expectedUpdatedAt }` (the status endpoint additionally keeps its
    existing current-status condition). `count === 0` → `409`
@@ -142,15 +151,30 @@ Check order on each of these three endpoints:
    update its view without a second round trip. There is no separate
    "compare, then update" step: two concurrent requests holding the same
    `expectedUpdatedAt` cannot both succeed; exactly one write applies and
-   the other gets the 409.
-6. `count === 1` → `200` with the updated Ticket representation (new
+   the other gets the 409 (this closes the race between the step-4 read
+   and the write; the pre-check alone would not).
+7. `count === 1` → `200` with the updated Ticket representation (new
    `updatedAt`).
 
 Owner and it-priority previously used a plain `update`; Lab 4 changes both
 to the conditional write. Because `updatedAt` is also bumped by Attachment
 upload/removal and the Requester's resolve-indication (BR-14), a 409 here
 can be caused by those writes too; the recovery (refresh, retry with the
-new `updatedAt`) is identical.
+new `updatedAt`) is identical. `expectedUpdatedAt` is required on all
+three endpoints: missing or not an ISO 8601 date-time is a `400` field
+error on `expectedUpdatedAt`, reported together with any other body field
+errors and before the Ticket is looked up.
+
+### 2.1 `status` list filter (BR-27)
+
+`GET /api/tickets` and `GET /api/staff/tickets` parse `status` as one value
+or a comma-separated list (whitespace around tokens tolerated, duplicates
+ignored, matching is case-sensitive). Any unrecognized or empty token
+rejects the request with `400` and `{ errors: [{ field: "status",
+message: "status must be one or more recognized Ticket statuses,
+comma-separated" }] }`. This also replaces the Requester list's Lab 2
+"`status` must be `NEW`" rule, which only reflected that `NEW` was the sole
+status at the time; the Requester endpoint now accepts every status.
 
 ## 3. Dashboard endpoints
 

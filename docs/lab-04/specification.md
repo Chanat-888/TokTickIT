@@ -169,7 +169,7 @@ the reasons given):
   Ticket's `updatedAt`. The Ticket's concurrency token (BR-17) changes on
   every write to the Ticket row itself: Status, Owner, IT Priority, the
   Requester's resolve-indication (lab-03 BR-24), and Attachment upload/
-  soft-removal (lab-02 BR-39, unchanged in Lab 4). A stale-write 409 can
+  soft-removal (lab-02 BR-39, made effective in Lab 4, §11.16). A stale-write 409 can
   therefore also be caused by one of those writes, not only by another
   staff member's workflow change; the client recovers the same way
   (refresh, retry).
@@ -236,8 +236,12 @@ the reasons given):
   force unchanged except where explicitly superseded above (BR-17).
 - BR-27 The existing `status` query parameter on `GET /api/tickets`
   (lab-02) and `GET /api/staff/tickets` (lab-03) is extended to accept a
-  comma-separated list of status values (e.g. `status=NEW,OPEN`), purely
-  additive: a single value keeps behaving exactly as before. This lets a
+  comma-separated list of status values (e.g. `status=NEW,OPEN`). A single
+  value keeps behaving as before with one exception: the Requester list
+  (`GET /api/tickets`) accepted only `NEW` in Lab 2 because `NEW` was then
+  the sole status, so `status=RESOLVED` (or any non-`NEW` status) changes
+  from 400 to 200 (§11.16-17). On `GET /api/staff/tickets` a single value
+  is unchanged. This lets a
   dashboard drill-down link (BR-25) reproduce a grouped metric's (BR-20/
   BR-21) exact filter instead of approximating it.
 
@@ -435,7 +439,9 @@ value (BR-27).
   its Description and Result, then the update succeeds and Performed By
   still shows IT Staff A (BR-09/BR-10).
 - AC-16 Given all Lab 1-3 automated tests, when the Lab 4 test suite runs
-  against `main`, then they continue to pass unmodified in behavior
+  against `main`, then they continue to pass unmodified in behavior,
+  except the two superseded contracts listed in §11.17 (BR-17's required
+  `expectedUpdatedAt`, BR-27's widened Requester `status` filter)
   (regression, FR-12).
 - AC-17 Given IT Staff holding a Ticket at `updatedAt` T, when the
   Requester uploads an Attachment (bumping `updatedAt`) and IT Staff then
@@ -456,7 +462,9 @@ following hold on the final `main` branch:
   skipped.
 - All Lab 1-3 tests (`server/tests/lab-0{1,2,3}/*`, the corresponding
   `client/.../lab-0{1,2,3}` component tests, and `e2e/lab-0{1,2,3}/*`)
-  still pass unmodified in behavior, proving the regression requirement.
+  still pass unmodified in behavior, proving the regression requirement,
+  except the two tests edited for the contracts Lab 4 supersedes on purpose
+  (§11.17); every other Lab 1-3 test is untouched.
 - `server/tests/lab-04/*`, the four `client/.../lab-04` component test
   files, and `e2e/lab-04/*` all pass with zero skipped/disabled/todo
   tests, from the commands documented in `tests.md`.
@@ -507,10 +515,9 @@ Meaningful choices not already fixed by the handout, each with its reason:
    every Ticket write and needs no migration.
 6. Action Taken create/update never bumps `Ticket.updatedAt` — an Action
    Taken edit must not invalidate another user's in-flight Ticket status
-   change. Attachment upload/removal and resolve-indication still bump it
-   (lab-02 BR-39, lab-03 BR-24 are left unchanged to avoid Lab 2/3
-   regressions), so a Requester attaching a file can cause a staff 409;
-   accepted as a safe, recoverable false-positive (BR-14).
+   change. Attachment upload/removal and resolve-indication also bump it
+   (lab-02 BR-39, lab-03 BR-24), so a Requester attaching a file can cause
+   a staff 409; accepted as a safe, recoverable false-positive (BR-14).
 7. The concurrency check (BR-17) applies only to Ticket Status/Owner/IT
    Priority writes, not to Action Taken updates — the handout's §6.1
    conflict requirement is stated specifically for "Ticket Resolution and
@@ -553,3 +560,19 @@ Meaningful choices not already fixed by the handout, each with its reason:
     and the owner and it-priority endpoints use a plain `update`; Lab 4
     changes all three (status keeps its current-status condition and adds
     the `updatedAt` one).
+16. Lab 2's BR-39 (attachment upload/removal touches the parent Ticket's
+    `updatedAt`) was implemented as `ticket.update({ data: {} })`, which
+    Prisma treats as a no-op, so `updatedAt` never actually changed and the
+    Lab 2 test could not tell (it asserts `>=`). Lab 4 fixes it to set
+    `updatedAt` explicitly, because BR-14/BR-17 depend on it. This is the
+    one Lab 2 behavior change beyond BR-27; it makes the code match Lab 2's
+    own written rule.
+17. Tests whose contracts Lab 4 supersedes on purpose are updated, not
+    left failing: Lab 3 `staff-ticket-detail.api.test.ts` now sends
+    `expectedUpdatedAt` (BR-17), and Lab 2 `my-tickets.api.test.ts` API-28
+    uses an unrecognized status instead of `RESOLVED` (BR-27). AC-16's
+    "unmodified in behavior" means every other Lab 1-3 behavior; these two
+    edits are the contract changes themselves.
+18. A stale write is detected before the change is judged (api-spec §2 step
+    4) as well as by the atomic write (step 6): the pre-check gives stale
+    callers the right message, the atomic write closes the race.

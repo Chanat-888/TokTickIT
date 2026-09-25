@@ -827,6 +827,24 @@ textarea.field__control {
   gap: var(--space-md);
 }
 
+/* Stale-write conflict (docs/lab-04/ui-spec.md §3): warning palette, inline in the Operations panel. */
+.ticket-conflict-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--color-warning-border);
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  border-radius: var(--radius-control);
+}
+
+.ticket-conflict-banner p {
+  margin: 0;
+}
+
 /* docs/lab-03/ui-spec.md §5.6, §7 — confirms a Status change to Cancelled/
    Closed before the request is sent; same structure as Lab 2's
    .attachment-remove-confirm, kept as its own class since it confirms a

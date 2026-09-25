@@ -11,6 +11,7 @@ import {
   setTicketOwner,
   setTicketStatus,
   NotFoundError,
+  StaleTicketError,
   StatusTransitionError,
   type AssignableUser,
   type Category,
@@ -213,6 +214,10 @@ export default function StaffTicketDetail() {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [ticket, setTicket] = useState<StaffTicketDetailData | null>(null);
 
+  // BR-17: set when a Status/Owner/IT-Priority write hit a stale-write 409;
+  // the controls stay disabled until the user refreshes (ui-spec.md §3).
+  const [conflict, setConflict] = useState(false);
+
   const [ownerSaving, setOwnerSaving] = useState(false);
   const [ownerError, setOwnerError] = useState<string | null>(null);
 
@@ -273,14 +278,15 @@ export default function StaffTicketDetail() {
     setOwnerSaving(true);
     setOwnerError(null);
     try {
-      await setTicketOwner(ticket.id, user.id);
+      await setTicketOwner(ticket.id, user.id, ticket.updatedAt);
       // Re-fetch rather than merge just the changed field: another staff
       // member's edit made since page load (e.g. a concurrent status
       // change) would otherwise stay stale on screen after this partial
       // update (PR #52 review).
       load();
-    } catch {
-      setOwnerError("Couldn't claim this Ticket. Please try again.");
+    } catch (err) {
+      if (err instanceof StaleTicketError) setConflict(true);
+      else setOwnerError("Couldn't claim this Ticket. Please try again.");
     } finally {
       setOwnerSaving(false);
     }
@@ -291,10 +297,11 @@ export default function StaffTicketDetail() {
     setOwnerSaving(true);
     setOwnerError(null);
     try {
-      await setTicketOwner(ticket.id, newOwnerId);
+      await setTicketOwner(ticket.id, newOwnerId, ticket.updatedAt);
       load();
-    } catch {
-      setOwnerError("Couldn't reassign this Ticket. Please try again.");
+    } catch (err) {
+      if (err instanceof StaleTicketError) setConflict(true);
+      else setOwnerError("Couldn't reassign this Ticket. Please try again.");
     } finally {
       setOwnerSaving(false);
     }
@@ -305,10 +312,11 @@ export default function StaffTicketDetail() {
     setItPrioritySaving(true);
     setItPriorityError(null);
     try {
-      await setTicketItPriority(ticket.id, value);
+      await setTicketItPriority(ticket.id, value, ticket.updatedAt);
       load();
-    } catch {
-      setItPriorityError("Couldn't update IT Priority. Please try again.");
+    } catch (err) {
+      if (err instanceof StaleTicketError) setConflict(true);
+      else setItPriorityError("Couldn't update IT Priority. Please try again.");
     } finally {
       setItPrioritySaving(false);
     }
@@ -319,9 +327,13 @@ export default function StaffTicketDetail() {
     setStatusSaving(true);
     setStatusError(null);
     try {
-      await setTicketStatus(ticket.id, status);
+      await setTicketStatus(ticket.id, status, ticket.updatedAt);
       load();
     } catch (err) {
+      if (err instanceof StaleTicketError) {
+        setConflict(true);
+        return;
+      }
       setStatusError(
         err instanceof StatusTransitionError
           ? "That transition is no longer permitted."
@@ -440,13 +452,29 @@ export default function StaffTicketDetail() {
           <section className="ticket-ops-panel">
             <h2>Operations</h2>
 
+            {conflict && (
+              <div className="ticket-conflict-banner" role="alert">
+                <p>This ticket was changed by someone else.</p>
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={() => {
+                    setConflict(false);
+                    load();
+                  }}
+                >
+                  Refresh
+                </button>
+              </div>
+            )}
+
             <div className="field">
               <span className="field__label">Owner</span>
               {ticket.ownerId === null ? (
                 <button
                   type="button"
                   className={`btn btn--secondary${ownerSaving ? " btn--busy" : ""}`}
-                  disabled={ownerSaving}
+                  disabled={ownerSaving || conflict}
                   aria-busy={ownerSaving}
                   onClick={handleClaim}
                 >
@@ -458,7 +486,7 @@ export default function StaffTicketDetail() {
                   className="owner-select field__control"
                   aria-label="Owner"
                   value={ticket.ownerId}
-                  disabled={ownerSaving}
+                  disabled={ownerSaving || conflict}
                   onChange={(e) => handleReassign(Number(e.target.value))}
                 >
                   {!assignableUsers.some((u) => u.id === ticket.ownerId) && (
@@ -480,7 +508,7 @@ export default function StaffTicketDetail() {
                 className="field__control"
                 aria-label="IT Priority"
                 value={ticket.itPriority}
-                disabled={itPrioritySaving}
+                disabled={itPrioritySaving || conflict}
                 onChange={(e) => handleItPriorityChange(e.target.value as Priority)}
               >
                 <option value="LOW">Low</option>
@@ -496,7 +524,7 @@ export default function StaffTicketDetail() {
                 className="status-select field__control"
                 aria-label="Status"
                 value=""
-                disabled={statusSaving || allowedStatusTargets(ticket.status).length === 0}
+                disabled={conflict || statusSaving || allowedStatusTargets(ticket.status).length === 0}
                 onChange={(e) => handleStatusSelect(e.target.value)}
               >
                 <option value="" disabled>

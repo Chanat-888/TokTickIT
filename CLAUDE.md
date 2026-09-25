@@ -11,16 +11,27 @@ Course-issued guide (Thai/English). The PDF lives locally in `docs/` but is
 missing, ask the user for it. Read the whole PDF at session start before any
 git/GitHub action. A previous session got these wrong; do not.
 
-- **Linking a PR to its Issue = the Development panel, not a keyword.**
+- **Linking a PR to its Issue = the Development link, not a keyword.**
   `Closes #N` in the PR body does NOT link when the base is `lab4-staging`
-  (non-default branch); GitHub treats it as a plain mention. Right after
-  `gh pr create`, open the PR in the browser (Claude in Chrome), sidebar →
-  Development → gear → pick the Issue. Verify the sidebar says
-  "Successfully merging this pull request may close these issues" followed
-  by the Issue. "None yet" = not linked. (No API/CLI for this; use the
-  browser.) Still write `Closes #N` in the body for readability.
-- **Every PR, right after creating it**: link Issue (above), request
-  reviewer `ShitheadQuin`, assign PR and Issue to Chanat-888, label `lab-4`.
+  (non-default branch); GitHub treats it as a plain mention. Use `link_pr`
+  (see the PR procedure below), which does what the Development-panel gear
+  does; the PR sidebar then shows the Issue under Development. Still write
+  `Closes #N` in the body for readability.
+- **PR procedure (all steps, in this order; a PR is NOT "opened" until step 4
+  passes — never report it as done, and never move the card, before then):**
+  1. `gh pr create --base lab4-staging --label lab-4 --reviewer ShitheadQuin
+     --assignee Chanat-888` (also `gh issue edit N --add-assignee Chanat-888`).
+  2. Link the Issue with code (same as the Development panel; no browser
+     needed): `link_pr <pr#> <issue#>` (below).
+  3. Verify with `pr_linked <pr#>`. It must print the Issue number.
+  4. Only then `move_card <issue#> "PR Review"` and tell the user.
+  ```
+  link_pr() { gh api graphql -f query='mutation($is:ID!,$pr:[ID!]!){addCloseIssueReferences(input:{issueId:$is,pullRequestIds:$pr}){clientMutationId}}' -f is="$(gh issue view $2 --json id --jq .id)" -f 'pr[]='"$(gh pr view $1 --json id --jq .id)"; }
+  pr_linked() { gh api graphql -f query='query($n:Int!){repository(owner:"Chanat-888",name:"TokTickIT"){pullRequest(number:$n){timelineItems(itemTypes:[CONNECTED_EVENT],first:10){nodes{... on ConnectedEvent{subject{... on Issue{number}}}}}}}}' -F n=$1 --jq '[.data.repository.pullRequest.timelineItems.nodes[].subject.number]|tostring'; }
+  ```
+  An empty `[]` means NOT linked. A comment on the Issue or `Closes #N` in the
+  body does not count. (Discovered on PR #70: the GraphQL mutation
+  `addCloseIssueReferences` does what the Development-panel gear does.)
 - **Project board** "TokTickIT Individual Sprints" (user project #1). Move
   the Issue's card EVERY time its state changes, no exceptions — do it in
   the same step as the triggering action, then tell the user:
@@ -29,7 +40,7 @@ git/GitHub action. A previous session got these wrong; do not.
   | Issue created | Backlog (auto) |
   | Requirements read and understood, before starting | Specified |
   | Feature branch created, work begins (only the Issue being worked) | Started |
-  | PR opened AND linked via Development panel | PR Review |
+  | PR opened AND `pr_linked` verified | PR Review |
   | Reviewer requests changes / tests fail; fixing on the same branch | Fixing |
   | Fixes pushed and replied on the threads | PR Review |
   | Reviewer merged (then close the Issue by hand) | Done |
