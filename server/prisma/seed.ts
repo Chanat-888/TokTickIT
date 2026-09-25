@@ -65,6 +65,25 @@ const ASSIGNED_STATUSES = [
   "CANCELLED",
 ] as const;
 
+type ActionStep = {
+  description: string;
+  result: string;
+  byOther: boolean;
+  followUpNote: string | null;
+  attachmentNotes: string | null;
+};
+
+// Indexed by (assigned-ticket position % 3): none, one, three (two performers).
+const ACTION_PLANS: ActionStep[][] = [
+  [],
+  [{ description: "Restarted the service and cleared the local cache.", result: "Issue no longer reproduces.", byOther: false, followUpNote: null, attachmentNotes: null }],
+  [
+    { description: "Collected logs from the affected device.", result: "Logs attached for review.", byOther: false, followUpNote: null, attachmentNotes: "Screenshot of the error dialog is in the ticket attachments." },
+    { description: "Reviewed the logs and applied the vendor patch.", result: "Patch installed; awaiting user confirmation.", byOther: true, followUpNote: "Check with the requester on Friday that the fix held.", attachmentNotes: null },
+    { description: "Confirmed the fix with the requester by phone.", result: "Requester confirmed the problem is resolved.", byOther: false, followUpNote: null, attachmentNotes: null },
+  ],
+];
+
 function bumpPriority(p: (typeof PRIORITIES)[number]): (typeof PRIORITIES)[number] {
   return p === "LOW" ? "MEDIUM" : p === "MEDIUM" ? "HIGH" : "HIGH";
 }
@@ -224,6 +243,55 @@ async function main() {
           },
         });
       }
+
+      // Lab 4 Actions Taken (specification.md §7): assigned tickets cycle
+      // through zero / one / three actions; unassigned tickets stay at zero.
+      // Taylor Chen never performs an action, so the IT Staff Dashboard's
+      // "My Recent Actions Taken" empty state stays reachable. The three-
+      // action case is performed by two different staff (BR-02).
+      const performers = activeStaff.filter((s) => s.name !== "Taylor Chen");
+      const plan = ACTION_PLANS[Math.floor(i / 4) % 3];
+      const other = performers.find((p) => p.id !== owner.id);
+      if (plan.length > 0 && performers.some((p) => p.id === owner.id) && other) {
+        for (const [n, step] of plan.entries()) {
+          const idempotencyKey = `seed-action-${ticketNumber}-${n + 1}`;
+          const performer = step.byOther ? other : owner;
+          await prisma.actionTaken.upsert({
+            where: { ticketId_idempotencyKey: { ticketId: ticket.id, idempotencyKey } },
+            update: {},
+            create: {
+              ticketId: ticket.id,
+              performedById: performer.id,
+              description: step.description,
+              result: step.result,
+              followUpRequired: step.followUpNote !== null,
+              followUpNote: step.followUpNote,
+              attachmentNotes: step.attachmentNotes,
+              idempotencyKey,
+              createdAt: new Date(createdAt.getTime() + (n + 1) * 2 * 60 * 60 * 1000),
+            },
+          });
+        }
+      }
+    }
+
+    // Staff may act on any Ticket without owning it (BR-08), so a few
+    // unassigned Tickets also get one triage action.
+    if (!isAssigned && i % 8 === 0) {
+      const triager = activeStaff.filter((s) => s.name !== "Taylor Chen")[(i / 8) % 3];
+      const idempotencyKey = `seed-action-${ticketNumber}-1`;
+      await prisma.actionTaken.upsert({
+        where: { ticketId_idempotencyKey: { ticketId: ticket.id, idempotencyKey } },
+        update: {},
+        create: {
+          ticketId: ticket.id,
+          performedById: triager.id,
+          description: "Triaged the request and confirmed it is not a duplicate.",
+          result: "Ready to be picked up by the team.",
+          idempotencyKey,
+          createdAt: new Date(createdAt.getTime() + 60 * 60 * 1000),
+        },
+      });
     }
   }
 

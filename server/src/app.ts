@@ -5,10 +5,20 @@ import multer from "multer";
 import path from "node:path";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
-import { Prisma, type Ticket, type Attachment, type PublicComment, type InternalNote, type User, type Role } from "@prisma/client";
+import {
+  Prisma,
+  type Ticket,
+  type Attachment,
+  type PublicComment,
+  type InternalNote,
+  type ActionTaken,
+  type User,
+  type Role,
+} from "@prisma/client";
 import { getPrisma } from "./prisma.js";
 import { generateTicketNumber } from "./ticketNumber.js";
 import { validateTicketInput } from "./ticketValidation.js";
+import { validateActionFields, type FieldError } from "./actionTakenValidation.js";
 import { storeUploadedFile, UPLOADS_DIR } from "./uploads.js";
 import {
   SESSION_COOKIE_NAME,
@@ -1393,6 +1403,137 @@ app.get("/api/tickets/:id/notes", requireStaff, async (req: Request, res: Respon
 // Issue 42 — Administrator User Management (docs/lab-03/api-spec.md §4,
 // specification.md §5 Phase 8).
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Lab 4 — Actions Taken (docs/lab-04/api-spec.md §1)
+// ---------------------------------------------------------------------------
+
+function actionTakenToJSON(a: ActionTaken & { performedBy: User }) {
+  return {
+    id: a.id,
+    ticketId: a.ticketId,
+    performedById: a.performedById,
+    performedByName: a.performedBy.name,
+    description: a.description,
+    result: a.result,
+    followUpRequired: a.followUpRequired,
+    followUpNote: a.followUpNote,
+    attachmentNotes: a.attachmentNotes,
+    createdAt: a.createdAt.toISOString(),
+    updatedAt: a.updatedAt.toISOString(),
+  };
+}
+
+// BR-03/BR-04/BR-13: performer and timestamps never come from the client; a
+// retried create with the same idempotencyKey returns the original (200).
+app.post("/api/tickets/:id/actions-taken", requireStaff, async (req: Request, res: Response) => {
+  try {
+    const ticket = await findTicketById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const { errors, value } = validateActionFields(body);
+    const allErrors: FieldError[] = [...errors];
+    const key = body.idempotencyKey;
+    if (typeof key !== "string" || !IDEMPOTENCY_KEY_RE.test(key)) {
+      allErrors.push({ field: "idempotencyKey", message: "idempotencyKey must be a UUID" });
+    }
+    if (allErrors.length > 0 || !value) {
+      return res.status(400).json({ errors: allErrors });
+    }
+    const idempotencyKey = key as string;
+
+    const existing = await getPrisma().actionTaken.findUnique({
+      where: { ticketId_idempotencyKey: { ticketId: ticket.id, idempotencyKey } },
+      include: { performedBy: true },
+    });
+    if (existing) {
+      return res.status(200).json(actionTakenToJSON(existing));
+    }
+
+    try {
+      const created = await getPrisma().actionTaken.create({
+        data: { ...value, ticketId: ticket.id, performedById: req.user!.id, idempotencyKey },
+        include: { performedBy: true },
+      });
+      return res.status(201).json(actionTakenToJSON(created));
+    } catch (err) {
+      if (!isUniqueConstraintViolation(err, "ticketId", "idempotencyKey")) throw err;
+      const winner = await getPrisma().actionTaken.findUniqueOrThrow({
+        where: { ticketId_idempotencyKey: { ticketId: ticket.id, idempotencyKey } },
+        include: { performedBy: true },
+      });
+      return res.status(200).json(actionTakenToJSON(winner));
+    }
+  } catch (err) {
+    console.error(`POST /api/tickets/${req.params.id}/actions-taken failed:`, err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
+// BR-11/BR-12: a Requester sees every field on their own Tickets only.
+app.get("/api/tickets/:id/actions-taken", requireAnyRole, async (req: Request, res: Response) => {
+  try {
+    const ticket = await findAccessibleTicket(req.params.id, req.user!);
+    if (!ticket) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const actions = await getPrisma().actionTaken.findMany({
+      where: { ticketId: ticket.id },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      include: { performedBy: true },
+    });
+    return res.status(200).json({ data: actions.map(actionTakenToJSON) });
+  } catch (err) {
+    console.error(`GET /api/tickets/${req.params.id}/actions-taken failed:`, err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
+// BR-09/BR-10: any active staff may edit the five editable fields; ticketId,
+// performedById and createdAt in the body are ignored. BR-06 is applied to
+// the merged (existing + provided) state. Does not touch Ticket.updatedAt
+// (BR-14) and has no expectedUpdatedAt check (specification.md §11.7).
+app.patch("/api/tickets/:id/actions-taken/:actionId", requireStaff, async (req: Request, res: Response) => {
+  try {
+    const ticket = await findTicketById(req.params.id);
+    if (!ticket || !/^\d+$/.test(req.params.actionId)) {
+      return res.status(404).json({ error: "Not found" });
+    }
+    const existing = await getPrisma().actionTaken.findFirst({
+      where: { id: Number(req.params.actionId), ticketId: ticket.id },
+    });
+    if (!existing) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const pick = (field: keyof ActionTaken) => (body[field] !== undefined ? body[field] : existing[field]);
+    const { errors, value } = validateActionFields({
+      description: pick("description"),
+      result: pick("result"),
+      followUpRequired: pick("followUpRequired"),
+      followUpNote: pick("followUpNote"),
+      attachmentNotes: pick("attachmentNotes"),
+    });
+    if (errors.length > 0 || !value) {
+      return res.status(400).json({ errors });
+    }
+
+    const updated = await getPrisma().actionTaken.update({
+      where: { id: existing.id },
+      data: value,
+      include: { performedBy: true },
+    });
+    return res.status(200).json(actionTakenToJSON(updated));
+  } catch (err) {
+    console.error(`PATCH /api/tickets/${req.params.id}/actions-taken/${req.params.actionId} failed:`, err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
 
 const VALID_ROLES = new Set(["REQUESTER", "IT_STAFF", "ADMINISTRATOR"]);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

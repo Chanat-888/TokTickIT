@@ -353,10 +353,13 @@ Beyond the existing Lab 1-3 seed:
   populated Follow-up Note, and at least one has `followUpRequired =
   false`.
 - Enough seeded Tickets/Actions Taken exist that both Requester and IT
-  Staff dashboards show at least one non-zero metric; the seed also keeps
-  at least one active Requester with zero Tickets and at least one active
-  IT Staff user with zero owned Tickets/Actions Taken, so every dashboard
-  card's empty state is reachable too (handout §5.3).
+  Staff dashboards show at least one non-zero metric. Zero states stay
+  reachable too (handout §5.3): an active Requester with zero Tickets
+  (Priya Nair), an active IT Staff user who performs no Actions Taken
+  (Taylor Chen, so "My Recent Actions Taken" is empty), and `byStatus`
+  counts of 0 for any status the seed does not use. Ticket ownership in the
+  Lab 3 seed is not changed, so a staff user with zero owned Tickets is
+  demonstrated in the test database, not the dev seed.
 - Seed remains idempotent (safe to re-run), extending the existing
   upsert-based seed script rather than replacing it.
 
@@ -545,5 +548,8 @@ Meaningful choices not already fixed by the handout, each with its reason:
 15. Ticket writes under BR-17 use a single conditional write (`updateMany`
     with `where: { id, updatedAt: expectedUpdatedAt }`, `count === 0` →
     409) on all three endpoints, not check-then-update, so two concurrent
-    requests cannot both pass the check. The status endpoint already works
-    this way; owner and it-priority are brought in line.
+    requests cannot both pass the check. Today the status endpoint's
+    `updateMany` is conditioned on the current status only, not `updatedAt`,
+    and the owner and it-priority endpoints use a plain `update`; Lab 4
+    changes all three (status keeps its current-status condition and adds
+    the `updatedAt` one).
