@@ -19,15 +19,31 @@ before any git/GitHub action). A previous session got these wrong; do not.
   browser.) Still write `Closes #N` in the body for readability.
 - **Every PR, right after creating it**: link Issue (above), request
   reviewer `ShitheadQuin`, assign PR and Issue to Chanat-888, label `lab-4`.
-- **Project board** "TokTickIT Individual Sprints" (user project #1),
-  columns Backlog → Specified → Started → PR Review → Fixing → Done. New
-  Issues land in Backlog; Specified only after reading the requirements;
-  Started when the feature branch exists and only for the Issue being
-  worked; PR Review once the PR is opened AND linked; Fixing while
-  addressing review changes on the same branch, then back to PR Review
-  after pushing; Done after the reviewer merges. Use `gh project item-edit`
-  (field Status, project id `PVT_kwHOCwvtGc4BfkxK`) to move cards; the
-  project auto-adds issues and moves closed ones to Done.
+- **Project board** "TokTickIT Individual Sprints" (user project #1). Move
+  the Issue's card EVERY time its state changes, no exceptions — do it in
+  the same step as the triggering action, then tell the user:
+  | Trigger | Move card to |
+  |---|---|
+  | Issue created | Backlog (auto) |
+  | Requirements read and understood, before starting | Specified |
+  | Feature branch created, work begins (only the Issue being worked) | Started |
+  | PR opened AND linked via Development panel | PR Review |
+  | Reviewer requests changes / tests fail; fixing on the same branch | Fixing |
+  | Fixes pushed and replied on the threads | PR Review |
+  | Reviewer merged (then close the Issue by hand) | Done |
+  Command (run from the repo; issue number as $1, status name as $2):
+  ```
+  move_card() {
+    local item opt
+    item=$(gh project item-list 1 --owner Chanat-888 --limit 100 --format json --jq ".items[]|select(.content.number==$1)|.id")
+    case "$2" in Backlog) opt=f75ad846;; Specified) opt=47fc9ee4;; Started) opt=98236657;;
+      "PR Review") opt=db21eb3e;; Fixing) opt=fb21ca19;; Done) opt=9066ddcf;; esac
+    gh project item-edit --id "$item" --project-id PVT_kwHOCwvtGc4BfkxK       --field-id PVTSSF_lAHOCwvtGc4BfkxKzhZ2tUY --single-select-option-id "$opt"
+  }
+  ```
+  The project auto-adds new Issues to Backlog and moves closed ones to
+  Done. Verify a move with `gh project item-list 1 --owner Chanat-888
+  --format json` if unsure.
 - **After the reviewer merges into `lab4-staging`**: close the Issue by
   hand (merge into a non-default branch doesn't close it) and make sure the
   card is Done.
