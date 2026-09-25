@@ -6,8 +6,10 @@ Read this before starting work in a new session.
 
 ## MANDATORY: GitHub workflow — read `docs/GitHub_Workflow_Guide.pdf` first
 
-Course-issued guide (Thai/English, read the whole PDF at session start
-before any git/GitHub action). A previous session got these wrong; do not.
+Course-issued guide (Thai/English). The PDF lives locally in `docs/` but is
+**gitignored, not committed** (public repo, course material); if it is
+missing, ask the user for it. Read the whole PDF at session start before any
+git/GitHub action. A previous session got these wrong; do not.
 
 - **Linking a PR to its Issue = the Development panel, not a keyword.**
   `Closes #N` in the PR body does NOT link when the base is `lab4-staging`

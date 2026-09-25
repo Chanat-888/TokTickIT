@@ -75,7 +75,7 @@ rejects the whole request with 400, same as an invalid single value did.
 ## 1. Actions Taken endpoints
 
 **POST /api/tickets/:id/actions-taken** — IT Staff, Administrator.
-Body: `{ description: string, result: string, followUpRequired?: boolean, followUpNote?: string, attachmentNotes?: string, idempotencyKey: string }`.
+Body: `{ description: string, result: string, followUpRequired?: boolean, followUpNote?: string, attachmentNotes?: string, idempotencyKey: string (UUID) }`.
 - `201` — Action Taken representation (§0.2). `performedById`/
   `performedByName` come from the session (BR-03); `createdAt` from the
   server clock (BR-04).
@@ -85,7 +85,9 @@ Body: `{ description: string, result: string, followUpRequired?: boolean, follow
 - `400` — `description` or `result` empty/whitespace-only or over 2000
   characters (BR-05); `followUpRequired: true` with an empty/missing
   `followUpNote`, or `followUpNote` over 2000 characters (BR-06);
-  `attachmentNotes` over 500 characters (BR-07).
+  `attachmentNotes` over 500 characters (BR-07); `idempotencyKey` missing or
+  not a UUID (same format Ticket creation already requires, lab-02
+  BR-11) — field error on `idempotencyKey`.
 - `403` — caller is a Requester (BR-08).
 - `404` — Ticket not found.
 

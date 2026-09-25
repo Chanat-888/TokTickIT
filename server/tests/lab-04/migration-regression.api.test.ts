@@ -164,6 +164,8 @@ describe("Lab 3 -> Lab 4 migration and seed", () => {
 
     const actions = await getPrisma().actionTaken.findMany({ include: { ticket: true } });
     expect(actions.some((a) => a.ticket.ownerId !== a.performedById)).toBe(true);
+    expect(actions.some((a) => a.ticket.ownerId === null)).toBe(true);
+    expect(actions.some((a) => a.ticket.ownerId !== null)).toBe(true);
     expect(actions.some((a) => a.followUpRequired && a.followUpNote)).toBe(true);
     expect(actions.some((a) => !a.followUpRequired)).toBe(true);
   }, 60000);

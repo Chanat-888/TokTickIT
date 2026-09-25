@@ -274,6 +274,25 @@ async function main() {
         }
       }
     }
+
+    // Staff may act on any Ticket without owning it (BR-08), so a few
+    // unassigned Tickets also get one triage action.
+    if (!isAssigned && i % 8 === 0) {
+      const triager = activeStaff.filter((s) => s.name !== "Taylor Chen")[(i / 8) % 3];
+      const idempotencyKey = `seed-action-${ticketNumber}-1`;
+      await prisma.actionTaken.upsert({
+        where: { ticketId_idempotencyKey: { ticketId: ticket.id, idempotencyKey } },
+        update: {},
+        create: {
+          ticketId: ticket.id,
+          performedById: triager.id,
+          description: "Triaged the request and confirmed it is not a duplicate.",
+          result: "Ready to be picked up by the team.",
+          idempotencyKey,
+          createdAt: new Date(createdAt.getTime() + 60 * 60 * 1000),
+        },
+      });
+    }
   }
 
   const actualCount = await prisma.ticket.count();
