@@ -19,6 +19,7 @@ import { getPrisma } from "./prisma.js";
 import { generateTicketNumber } from "./ticketNumber.js";
 import { validateTicketInput } from "./ticketValidation.js";
 import { validateActionFields, type FieldError } from "./actionTakenValidation.js";
+import { parseStatusList, type TicketStatusValue } from "./statusFilter.js";
 import { storeUploadedFile, UPLOADS_DIR } from "./uploads.js";
 import {
   SESSION_COOKIE_NAME,
@@ -548,7 +549,7 @@ app.post(
       }
 
       // BR-39: a successful upload touches the parent Ticket's updatedAt.
-      await getPrisma().ticket.update({ where: { id: ticketId }, data: {} });
+      await getPrisma().ticket.update({ where: { id: ticketId }, data: { updatedAt: new Date() } });
 
       return res.status(201).json(created.map(attachmentToJSON));
     } catch (err) {
@@ -623,13 +624,13 @@ app.get("/api/tickets", requireRequester, async (req: Request, res: Response) =>
       }
     }
 
-    let status: "NEW" | undefined;
+    let statuses: TicketStatusValue[] | undefined;
     if (req.query.status !== undefined) {
-      const raw = String(req.query.status);
-      if (raw !== "NEW") {
-        errors.push({ field: "status", message: "Status must be NEW" });
+      const parsed = parseStatusList(String(req.query.status));
+      if (parsed.error) {
+        errors.push({ field: "status", message: parsed.error });
       } else {
-        status = "NEW";
+        statuses = parsed.statuses;
       }
     }
 
@@ -666,7 +667,7 @@ app.get("/api/tickets", requireRequester, async (req: Request, res: Response) =>
     const where: Prisma.TicketWhereInput = { requesterId };
     if (categoryId !== undefined) where.categoryId = categoryId;
     if (requestedPriority !== undefined) where.requestedPriority = requestedPriority;
-    if (status !== undefined) where.status = status;
+    if (statuses !== undefined) where.status = { in: statuses };
     if (search) {
       where.OR = [
         { ticketNumber: { startsWith: search } },
@@ -879,7 +880,7 @@ app.delete(
         data: { removedAt: new Date(), removalReason: reason ?? null },
       });
       // BR-39: removal also touches the parent Ticket's updatedAt.
-      await getPrisma().ticket.update({ where: { id: attachment.ticketId }, data: {} });
+      await getPrisma().ticket.update({ where: { id: attachment.ticketId }, data: { updatedAt: new Date() } });
 
       return res.status(200).json(attachmentToJSON(updated));
     } catch (err) {
@@ -1044,13 +1045,13 @@ app.get("/api/staff/tickets", requireStaff, async (req: Request, res: Response) 
   try {
     const errors: { field: string; message: string }[] = [];
 
-    let status: string | undefined;
+    let statuses: TicketStatusValue[] | undefined;
     if (req.query.status !== undefined) {
-      const raw = String(req.query.status);
-      if (!ALL_STATUSES.has(raw)) {
-        errors.push({ field: "status", message: "status must be a recognized Ticket status" });
+      const parsed = parseStatusList(String(req.query.status));
+      if (parsed.error) {
+        errors.push({ field: "status", message: parsed.error });
       } else {
-        status = raw;
+        statuses = parsed.statuses;
       }
     }
 
@@ -1130,7 +1131,7 @@ app.get("/api/staff/tickets", requireStaff, async (req: Request, res: Response) 
     const search = req.query.search !== undefined ? String(req.query.search) : undefined;
 
     const where: Prisma.TicketWhereInput = {};
-    if (status !== undefined) where.status = status as Prisma.TicketWhereInput["status"];
+    if (statuses !== undefined) where.status = { in: statuses };
     if (itPriority !== undefined) where.itPriority = itPriority;
     if (requestedPriority !== undefined) where.requestedPriority = requestedPriority;
     if (ownerId === "unassigned") where.ownerId = null;
@@ -1243,6 +1244,34 @@ app.get("/api/staff/tickets/:id", requireStaff, async (req: Request, res: Respon
   }
 });
 
+// BR-17 / api-spec.md §2 — every Status/Owner/IT-Priority write carries the
+// caller's last-known Ticket.updatedAt and is applied as one conditional
+// update, so two concurrent writers can never both succeed.
+const STALE_TICKET_ERROR = "This ticket was changed by someone else. Refresh and try again.";
+
+function parseExpectedUpdatedAt(raw: unknown): Date | null {
+  if (typeof raw !== "string") return null;
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+const EXPECTED_UPDATED_AT_ERROR = {
+  field: "expectedUpdatedAt",
+  message: "expectedUpdatedAt must be the Ticket's last-known updatedAt (ISO 8601)",
+};
+
+async function respondStale(res: Response, ticketId: number) {
+  const current = await getPrisma().ticket.findUniqueOrThrow({ where: { id: ticketId } });
+  return res.status(409).json({ error: STALE_TICKET_ERROR, current: staffTicketToJSON(current) });
+}
+
+// A caller whose token no longer matches the Ticket just read gets the stale
+// conflict before anything is judged against the changed state; the atomic
+// conditional write below still guards the race between this read and it.
+function isStale(ticket: Ticket, expectedUpdatedAt: Date): boolean {
+  return ticket.updatedAt.getTime() !== expectedUpdatedAt.getTime();
+}
+
 // BR-16/BR-18: null unassigns; a non-null value must reference an active
 // IT_STAFF/ADMINISTRATOR user. Checked in order: request-body shape (400,
 // no DB lookup needed) -> Ticket existence (404) -> the referenced user's
@@ -1250,11 +1279,15 @@ app.get("/api/staff/tickets/:id", requireStaff, async (req: Request, res: Respon
 // checks first, then existence, then the more expensive referential check.
 app.post("/api/staff/tickets/:id/owner", requireStaff, async (req: Request, res: Response) => {
   try {
-    const body = (req.body ?? {}) as { ownerId?: unknown };
+    const body = (req.body ?? {}) as { ownerId?: unknown; expectedUpdatedAt?: unknown };
+    const bodyErrors: FieldError[] = [];
     if (body.ownerId !== null && typeof body.ownerId !== "number") {
-      return res.status(400).json({
-        errors: [{ field: "ownerId", message: "ownerId must be an integer or null" }],
-      });
+      bodyErrors.push({ field: "ownerId", message: "ownerId must be an integer or null" });
+    }
+    const expectedUpdatedAt = parseExpectedUpdatedAt(body.expectedUpdatedAt);
+    if (!expectedUpdatedAt) bodyErrors.push(EXPECTED_UPDATED_AT_ERROR);
+    if (bodyErrors.length > 0 || !expectedUpdatedAt) {
+      return res.status(400).json({ errors: bodyErrors });
     }
 
     const ticket = await findTicketById(req.params.id);
@@ -1262,9 +1295,11 @@ app.post("/api/staff/tickets/:id/owner", requireStaff, async (req: Request, res:
       return res.status(404).json({ error: "Not found" });
     }
 
+    if (isStale(ticket, expectedUpdatedAt)) return respondStale(res, ticket.id);
+
     let ownerId: number | null = null;
     if (body.ownerId !== null) {
-      const candidate = await getPrisma().user.findUnique({ where: { id: body.ownerId } });
+      const candidate = await getPrisma().user.findUnique({ where: { id: body.ownerId as number } });
       if (!candidate || !candidate.isActive || (candidate.role !== "IT_STAFF" && candidate.role !== "ADMINISTRATOR")) {
         return res.status(400).json({
           errors: [{ field: "ownerId", message: "ownerId must reference an active IT Staff or Administrator user" }],
@@ -1273,7 +1308,12 @@ app.post("/api/staff/tickets/:id/owner", requireStaff, async (req: Request, res:
       ownerId = candidate.id;
     }
 
-    const updated = await getPrisma().ticket.update({ where: { id: ticket.id }, data: { ownerId } });
+    const written = await getPrisma().ticket.updateMany({
+      where: { id: ticket.id, updatedAt: expectedUpdatedAt },
+      data: { ownerId },
+    });
+    if (written.count === 0) return respondStale(res, ticket.id);
+    const updated = await getPrisma().ticket.findUniqueOrThrow({ where: { id: ticket.id } });
     return res.status(200).json(staffTicketToJSON(updated));
   } catch (err) {
     console.error(`POST /api/staff/tickets/${req.params.id}/owner failed:`, err);
@@ -1283,11 +1323,15 @@ app.post("/api/staff/tickets/:id/owner", requireStaff, async (req: Request, res:
 
 app.patch("/api/staff/tickets/:id/it-priority", requireStaff, async (req: Request, res: Response) => {
   try {
-    const body = (req.body ?? {}) as { itPriority?: unknown };
+    const body = (req.body ?? {}) as { itPriority?: unknown; expectedUpdatedAt?: unknown };
+    const bodyErrors: FieldError[] = [];
     if (typeof body.itPriority !== "string" || !PRIORITIES_FOR_FILTER.has(body.itPriority)) {
-      return res.status(400).json({
-        errors: [{ field: "itPriority", message: "itPriority must be LOW, MEDIUM, or HIGH" }],
-      });
+      bodyErrors.push({ field: "itPriority", message: "itPriority must be LOW, MEDIUM, or HIGH" });
+    }
+    const expectedUpdatedAt = parseExpectedUpdatedAt(body.expectedUpdatedAt);
+    if (!expectedUpdatedAt) bodyErrors.push(EXPECTED_UPDATED_AT_ERROR);
+    if (bodyErrors.length > 0 || !expectedUpdatedAt) {
+      return res.status(400).json({ errors: bodyErrors });
     }
 
     const ticket = await findTicketById(req.params.id);
@@ -1295,10 +1339,14 @@ app.patch("/api/staff/tickets/:id/it-priority", requireStaff, async (req: Reques
       return res.status(404).json({ error: "Not found" });
     }
 
-    const updated = await getPrisma().ticket.update({
-      where: { id: ticket.id },
+    if (isStale(ticket, expectedUpdatedAt)) return respondStale(res, ticket.id);
+
+    const written = await getPrisma().ticket.updateMany({
+      where: { id: ticket.id, updatedAt: expectedUpdatedAt },
       data: { itPriority: body.itPriority as Ticket["itPriority"] },
     });
+    if (written.count === 0) return respondStale(res, ticket.id);
+    const updated = await getPrisma().ticket.findUniqueOrThrow({ where: { id: ticket.id } });
     return res.status(200).json(staffTicketToJSON(updated));
   } catch (err) {
     console.error(`PATCH /api/staff/tickets/${req.params.id}/it-priority failed:`, err);
@@ -1311,11 +1359,15 @@ app.patch("/api/staff/tickets/:id/it-priority", requireStaff, async (req: Reques
 // only exists once the Ticket is fetched.
 app.patch("/api/staff/tickets/:id/status", requireStaff, async (req: Request, res: Response) => {
   try {
-    const body = (req.body ?? {}) as { status?: unknown };
+    const body = (req.body ?? {}) as { status?: unknown; expectedUpdatedAt?: unknown };
+    const bodyErrors: FieldError[] = [];
     if (typeof body.status !== "string" || !ALL_STATUSES.has(body.status)) {
-      return res.status(400).json({
-        errors: [{ field: "status", message: "status must be a recognized Ticket status" }],
-      });
+      bodyErrors.push({ field: "status", message: "status must be a recognized Ticket status" });
+    }
+    const expectedUpdatedAt = parseExpectedUpdatedAt(body.expectedUpdatedAt);
+    if (!expectedUpdatedAt) bodyErrors.push(EXPECTED_UPDATED_AT_ERROR);
+    if (bodyErrors.length > 0 || !expectedUpdatedAt) {
+      return res.status(400).json({ errors: bodyErrors });
     }
 
     const ticket = await findTicketById(req.params.id);
@@ -1323,24 +1375,22 @@ app.patch("/api/staff/tickets/:id/status", requireStaff, async (req: Request, re
       return res.status(404).json({ error: "Not found" });
     }
 
+    if (isStale(ticket, expectedUpdatedAt)) return respondStale(res, ticket.id);
+
     const allowedTargets = STATUS_TRANSITIONS[ticket.status] ?? [];
-    if (!allowedTargets.includes(body.status)) {
+    if (!allowedTargets.includes(body.status as string)) {
       return res.status(409).json({ error: "Status transition not permitted" });
     }
 
-    // Guards against two staff acting concurrently: without the status
-    // condition here, both could read the same old status, both pass the
-    // matrix check above, and the second plain update() would silently
-    // overwrite the first. updateMany's where clause makes the write
-    // conditional on the status still being what we validated against; a
-    // count of 0 means it changed underneath us since the read above.
-    const updateResult = await getPrisma().ticket.updateMany({
-      where: { id: ticket.id, status: ticket.status },
+    // BR-17: one atomic conditional write. The where clause holds the
+    // caller's expectedUpdatedAt (and the status the transition was validated
+    // against), so of two concurrent requests exactly one can match; count 0
+    // means the Ticket changed underneath the caller.
+    const written = await getPrisma().ticket.updateMany({
+      where: { id: ticket.id, updatedAt: expectedUpdatedAt, status: ticket.status },
       data: { status: body.status as Ticket["status"] },
     });
-    if (updateResult.count === 0) {
-      return res.status(409).json({ error: "Status transition not permitted" });
-    }
+    if (written.count === 0) return respondStale(res, ticket.id);
 
     const updated = await getPrisma().ticket.findUniqueOrThrow({ where: { id: ticket.id } });
     return res.status(200).json(staffTicketToJSON(updated));

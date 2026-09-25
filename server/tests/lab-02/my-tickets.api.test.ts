@@ -292,7 +292,7 @@ describe("My Tickets", () => {
   });
 
   // API-28
-  it("returns 400 for invalid sortBy, invalid sortDir, and status=RESOLVED", async () => {
+  it("returns 400 for invalid sortBy, invalid sortDir, and an unrecognized status", async () => {
     const requester = await seedRequester("Alex Rivera", "alex@example.com");
 
     const badSortBy = await request(app)
@@ -302,7 +302,7 @@ describe("My Tickets", () => {
       .get("/api/tickets?sortDir=sideways")
       .set("Cookie", await sessionCookieFor(requester.id));
     const badStatus = await request(app)
-      .get("/api/tickets?status=RESOLVED")
+      .get("/api/tickets?status=DELETED")
       .set("Cookie", await sessionCookieFor(requester.id));
 
     expect(badSortBy.status).toBe(400);
@@ -314,7 +314,9 @@ describe("My Tickets", () => {
       expect.arrayContaining([expect.objectContaining({ field: "sortDir" })]),
     );
     expect(badStatus.status).toBe(400);
-    expect(badStatus.body.errors).toEqual([{ field: "status", message: "Status must be NEW" }]);
+    // Lab 4 BR-27 widened this filter to every status (and comma lists); an
+    // unrecognized value is still a 400 on the `status` field.
+    expect(badStatus.body.errors).toEqual([expect.objectContaining({ field: "status" })]);
   });
 
   // API-29

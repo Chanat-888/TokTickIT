@@ -26,6 +26,9 @@ type TicketStatus =
   | "CANCELLED";
 type Role = "REQUESTER" | "IT_STAFF" | "ADMINISTRATOR";
 
+// docs/lab-04 BR-17: owner/it-priority/status writes require expectedUpdatedAt.
+const NOW = new Date().toISOString();
+
 async function truncateAll() {
   await getPrisma().$executeRawUnsafe(
     `TRUNCATE TABLE "Attachment", "Ticket", "User", "RelatedSystem", "Category" RESTART IDENTITY CASCADE;`,
@@ -157,7 +160,7 @@ describe("IT Staff Ticket Detail", () => {
     const res = await request(app)
       .post(`/api/staff/tickets/${ticket.id}/owner`)
       .set("Cookie", await sessionCookieFor(staff.id))
-      .send({ ownerId: staff.id });
+      .send({ ownerId: staff.id, expectedUpdatedAt: ticket.updatedAt.toISOString() });
 
     expect(res.status).toBe(200);
     expect(res.body.ownerId).toBe(staff.id);
@@ -177,7 +180,7 @@ describe("IT Staff Ticket Detail", () => {
     const res = await request(app)
       .post(`/api/staff/tickets/${ticket.id}/owner`)
       .set("Cookie", await sessionCookieFor(staff.id))
-      .send({ ownerId: staff.id });
+      .send({ ownerId: staff.id, expectedUpdatedAt: ticket.updatedAt.toISOString() });
 
     expect(res.status).toBe(200);
     expect(res.body.ownerId).toBe(staff.id);
@@ -191,8 +194,8 @@ describe("IT Staff Ticket Detail", () => {
     const ticket = await seedTicket({ requesterId: requester.id, categoryId: category.id, relatedSystemId: relatedSystem.id });
     const cookie = await sessionCookieFor(staff.id);
 
-    const toRequester = await request(app).post(`/api/staff/tickets/${ticket.id}/owner`).set("Cookie", cookie).send({ ownerId: otherRequester.id });
-    const toInactiveStaff = await request(app).post(`/api/staff/tickets/${ticket.id}/owner`).set("Cookie", cookie).send({ ownerId: inactiveStaff.id });
+    const toRequester = await request(app).post(`/api/staff/tickets/${ticket.id}/owner`).set("Cookie", cookie).send({ ownerId: otherRequester.id, expectedUpdatedAt: ticket.updatedAt.toISOString() });
+    const toInactiveStaff = await request(app).post(`/api/staff/tickets/${ticket.id}/owner`).set("Cookie", cookie).send({ ownerId: inactiveStaff.id, expectedUpdatedAt: ticket.updatedAt.toISOString() });
 
     expect(toRequester.status).toBe(400);
     expect(toInactiveStaff.status).toBe(400);
@@ -206,7 +209,7 @@ describe("IT Staff Ticket Detail", () => {
     const res = await request(app)
       .patch(`/api/staff/tickets/${ticket.id}/it-priority`)
       .set("Cookie", await sessionCookieFor(staff.id))
-      .send({ itPriority: "HIGH" });
+      .send({ itPriority: "HIGH", expectedUpdatedAt: ticket.updatedAt.toISOString() });
 
     expect(res.status).toBe(200);
     expect(res.body.itPriority).toBe("HIGH");
@@ -220,7 +223,7 @@ describe("IT Staff Ticket Detail", () => {
     const res = await request(app)
       .patch(`/api/staff/tickets/${ticket.id}/status`)
       .set("Cookie", await sessionCookieFor(staff.id))
-      .send({ status: "RESOLVED" });
+      .send({ status: "RESOLVED", expectedUpdatedAt: ticket.updatedAt.toISOString() });
 
     expect(res.status).toBe(200);
     expect(res.body.status).toBe("RESOLVED");
@@ -234,7 +237,7 @@ describe("IT Staff Ticket Detail", () => {
     const res = await request(app)
       .patch(`/api/staff/tickets/${ticket.id}/status`)
       .set("Cookie", await sessionCookieFor(staff.id))
-      .send({ status: "CLOSED" });
+      .send({ status: "CLOSED", expectedUpdatedAt: ticket.updatedAt.toISOString() });
 
     expect(res.status).toBe(409);
     expect(res.body).toEqual({ error: "Status transition not permitted" });
@@ -248,7 +251,7 @@ describe("IT Staff Ticket Detail", () => {
     const res = await request(app)
       .patch(`/api/staff/tickets/${ticket.id}/status`)
       .set("Cookie", await sessionCookieFor(requester.id))
-      .send({ status: "OPEN" });
+      .send({ status: "OPEN", expectedUpdatedAt: ticket.updatedAt.toISOString() });
 
     expect(res.status).toBe(403);
   });
@@ -258,9 +261,9 @@ describe("IT Staff Ticket Detail", () => {
     const { staff } = await seedFixtures();
     const cookie = await sessionCookieFor(staff.id);
 
-    const owner = await request(app).post("/api/staff/tickets/999999/owner").set("Cookie", cookie).send({ ownerId: staff.id });
-    const itPriority = await request(app).patch("/api/staff/tickets/999999/it-priority").set("Cookie", cookie).send({ itPriority: "HIGH" });
-    const status = await request(app).patch("/api/staff/tickets/999999/status").set("Cookie", cookie).send({ status: "OPEN" });
+    const owner = await request(app).post("/api/staff/tickets/999999/owner").set("Cookie", cookie).send({ ownerId: staff.id, expectedUpdatedAt: NOW });
+    const itPriority = await request(app).patch("/api/staff/tickets/999999/it-priority").set("Cookie", cookie).send({ itPriority: "HIGH", expectedUpdatedAt: NOW });
+    const status = await request(app).patch("/api/staff/tickets/999999/status").set("Cookie", cookie).send({ status: "OPEN", expectedUpdatedAt: NOW });
 
     expect(owner.status).toBe(404);
     expect(itPriority.status).toBe(404);

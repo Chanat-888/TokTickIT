@@ -396,35 +396,12 @@ export async function getStaffTicket(id: number): Promise<StaffTicketDetail> {
   return (await res.json()) as StaffTicketDetail;
 }
 
-// BR-18: null unassigns; any other value claims/(re)assigns.
-export async function setTicketOwner(ticketId: number, ownerId: number | null): Promise<StaffTicket> {
-  const res = await apiFetch(`/api/staff/tickets/${ticketId}/owner`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ownerId }),
-  });
-  if (res.status === 404) {
-    throw new NotFoundError("Not found");
+// docs/lab-04 BR-17: thrown on a stale-write 409 so the UI can offer a
+// refresh; `current` is the fresh Ticket the server returned with it.
+export class StaleTicketError extends Error {
+  constructor(public readonly current: StaffTicket) {
+    super("This ticket was changed by someone else.");
   }
-  if (!res.ok) {
-    throw new Error(`Set owner failed with status ${res.status}`);
-  }
-  return (await res.json()) as StaffTicket;
-}
-
-export async function setTicketItPriority(ticketId: number, itPriority: Priority): Promise<StaffTicket> {
-  const res = await apiFetch(`/api/staff/tickets/${ticketId}/it-priority`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ itPriority }),
-  });
-  if (res.status === 404) {
-    throw new NotFoundError("Not found");
-  }
-  if (!res.ok) {
-    throw new Error(`Set IT priority failed with status ${res.status}`);
-  }
-  return (await res.json()) as StaffTicket;
 }
 
 // BR-19: thrown on 409 so the UI can surface the specific message — the
@@ -432,18 +409,71 @@ export async function setTicketItPriority(ticketId: number, itPriority: Priority
 // fallback (e.g. a stale screen) rather than the normal path.
 export class StatusTransitionError extends Error {}
 
-export async function setTicketStatus(ticketId: number, status: TicketStatus): Promise<StaffTicket> {
-  const res = await apiFetch(`/api/staff/tickets/${ticketId}/status`, {
-    method: "PATCH",
+// A 409 from the three Ticket writes is either a stale write (carries
+// `current`) or, for status only, an illegal transition.
+async function throwOnTicketConflict(res: Response): Promise<void> {
+  if (res.status !== 409) return;
+  const body = (await res.json().catch(() => ({}))) as { current?: StaffTicket };
+  if (body.current) throw new StaleTicketError(body.current);
+  throw new StatusTransitionError("Status transition not permitted");
+}
+
+// BR-18: null unassigns; any other value claims/(re)assigns. Every write
+// sends the Ticket's last-known updatedAt (BR-17).
+export async function setTicketOwner(
+  ticketId: number,
+  ownerId: number | null,
+  expectedUpdatedAt: string,
+): Promise<StaffTicket> {
+  const res = await apiFetch(`/api/staff/tickets/${ticketId}/owner`, {
+    method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ ownerId, expectedUpdatedAt }),
   });
   if (res.status === 404) {
     throw new NotFoundError("Not found");
   }
-  if (res.status === 409) {
-    throw new StatusTransitionError("Status transition not permitted");
+  await throwOnTicketConflict(res);
+  if (!res.ok) {
+    throw new Error(`Set owner failed with status ${res.status}`);
   }
+  return (await res.json()) as StaffTicket;
+}
+
+export async function setTicketItPriority(
+  ticketId: number,
+  itPriority: Priority,
+  expectedUpdatedAt: string,
+): Promise<StaffTicket> {
+  const res = await apiFetch(`/api/staff/tickets/${ticketId}/it-priority`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ itPriority, expectedUpdatedAt }),
+  });
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  await throwOnTicketConflict(res);
+  if (!res.ok) {
+    throw new Error(`Set IT priority failed with status ${res.status}`);
+  }
+  return (await res.json()) as StaffTicket;
+}
+
+export async function setTicketStatus(
+  ticketId: number,
+  status: TicketStatus,
+  expectedUpdatedAt: string,
+): Promise<StaffTicket> {
+  const res = await apiFetch(`/api/staff/tickets/${ticketId}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status, expectedUpdatedAt }),
+  });
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  await throwOnTicketConflict(res);
   if (!res.ok) {
     throw new Error(`Set status failed with status ${res.status}`);
   }

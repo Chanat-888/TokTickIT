@@ -27,6 +27,7 @@ Component (Vitest + React Testing Library), UI Style (same, asserting only
 `client/tests/lab-04/`); e2e `actions-taken-flow.spec.ts`,
 `ticket-resolution.spec.ts`, `dashboards.spec.ts` (in `e2e/lab-04/`). Added
 beyond the minimum: `server/tests/lab-04/action-validation.unit.test.ts`,
+`server/tests/lab-04/status-rules.unit.test.ts`,
 `server/tests/lab-04/status-filter.api.test.ts`,
 `server/tests/lab-04/migration-regression.api.test.ts`,
 `client/tests/lab-04/style/dashboard.style.test.tsx`,
@@ -60,8 +61,8 @@ a test at its edge value (max passes, max+1 fails).
 | UNIT-01 | Unit | BR-05 | Description/Result validator boundaries | empty/whitespace fails; 2000 passes; 2001 fails | `server/tests/lab-04/action-validation.unit.test.ts` | Pass |
 | UNIT-02 | Unit | BR-06, AC-03 | Follow-up rule | `followUpRequired:true` + empty note fails; true + note passes; false + note → note dropped | `server/tests/lab-04/action-validation.unit.test.ts` | Pass |
 | UNIT-03 | Unit | BR-07 | Attachment Notes limit | 500 passes; 501 fails; absent passes | `server/tests/lab-04/action-validation.unit.test.ts` | Pass |
-| UNIT-04 | Unit | BR-15 | Status-transition legality (unchanged matrix) | every pair in specification.md §5 allowed; every other pair, incl. from Cancelled, rejected | `server/tests/lab-04/action-validation.unit.test.ts` | |
-| UNIT-05 | Unit | BR-27 | `status` list parser | `NEW,OPEN` → two values; single value unchanged; unknown token → error | `server/tests/lab-04/action-validation.unit.test.ts` | |
+| UNIT-04 | Unit | BR-15 | Status-transition legality (unchanged matrix) | every pair in specification.md §5 allowed; every other pair, incl. from Cancelled, rejected | `server/tests/lab-04/status-rules.unit.test.ts` | Pass |
+| UNIT-05 | Unit | BR-27 | `status` list parser | `NEW,OPEN` → two values; single value unchanged; unknown token → error | `server/tests/lab-04/status-rules.unit.test.ts` | Pass |
 
 ### 2.2 API/Integration
 
@@ -86,23 +87,23 @@ a test at its edge value (max passes, max+1 fails).
 
 | Test ID | Type | Requirement/AC | What It Tests | Expected Result | Automated Test File | Final |
 |---|---|---|---|---|---|---|
-| API-13 | API | AC-09, BR-15 | `New` → `Closed` | 409 "Status transition not permitted" | `server/tests/lab-04/ticket-workflow.api.test.ts` | |
-| API-14 | API | AC-10, BR-16 | `In Progress` → `Resolved` on a Ticket with zero Actions Taken | 200 | `server/tests/lab-04/ticket-workflow.api.test.ts` | |
-| API-15 | API | BR-15, lab-03 AC-19 | Requester `PATCH` status/it-priority/owner directly | 403 | `server/tests/lab-04/ticket-workflow.api.test.ts` | |
-| API-16 | API | AC-08, BR-17 | Two status changes, same `expectedUpdatedAt`, fired concurrently | exactly one 200, one 409 with `current` Ticket | `server/tests/lab-04/ticket-workflow.api.test.ts` | |
-| API-17 | API | BR-17, §11.15 | Same concurrent pair on owner and on it-priority endpoints | exactly one 200, one 409 each (proves conditional write on all three) | `server/tests/lab-04/ticket-workflow.api.test.ts` | |
-| API-18 | API | AC-17, BR-14 | Requester uploads Attachment, then staff status change with old `expectedUpdatedAt` | 409 + `current`; retry with `current.updatedAt` succeeds | `server/tests/lab-04/ticket-workflow.api.test.ts` | |
-| API-19 | API | BR-17 | Same as API-18 after Requester resolve-indication | 409; retry succeeds | `server/tests/lab-04/ticket-workflow.api.test.ts` | |
-| API-20 | API | BR-17 | Write with missing/malformed `expectedUpdatedAt` | 400 | `server/tests/lab-04/ticket-workflow.api.test.ts` | |
-| API-21 | API | BR-18, lab-03 BR-24 | Requester resolve-indication | Status unchanged | `server/tests/lab-04/ticket-workflow.api.test.ts` | |
+| API-13 | API | AC-09, BR-15 | `New` → `Closed` | 409 "Status transition not permitted" | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| API-14 | API | AC-10, BR-16 | `In Progress` → `Resolved` on a Ticket with zero Actions Taken | 200 | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| API-15 | API | BR-15, lab-03 AC-19 | Requester `PATCH` status/it-priority/owner directly | 403 | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| API-16 | API | AC-08, BR-17 | Two status changes, same `expectedUpdatedAt`, fired concurrently | exactly one 200, one 409 with `current` Ticket | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| API-17 | API | BR-17, §11.15 | Same concurrent pair on owner and on it-priority endpoints | exactly one 200, one 409 each (proves conditional write on all three) | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| API-18 | API | AC-17, BR-14 | Requester uploads Attachment, then staff status change with old `expectedUpdatedAt` | 409 + `current`; retry with `current.updatedAt` succeeds | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| API-19 | API | BR-17 | Same as API-18 after Requester resolve-indication | 409; retry succeeds | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| API-20 | API | BR-17 | Write with missing/malformed `expectedUpdatedAt` | 400 | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| API-21 | API | BR-18, lab-03 BR-24 | Requester resolve-indication | Status unchanged | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
 
 **status-filter.api.test.ts**
 
 | Test ID | Type | Requirement/AC | What It Tests | Expected Result | Automated Test File | Final |
 |---|---|---|---|---|---|---|
-| API-22 | API | AC-18, BR-27 | `GET /api/staff/tickets?status=NEW,OPEN` | only New and Open Tickets | `server/tests/lab-04/status-filter.api.test.ts` | |
-| API-23 | API | BR-27 | `GET /api/tickets?status=NEW,OPEN,IN_PROGRESS,REOPENED` as Requester | only that Requester's matching Tickets | `server/tests/lab-04/status-filter.api.test.ts` | |
-| API-24 | API | BR-27 | Single value and invalid list token | single unchanged; `NEW,BOGUS` → 400 | `server/tests/lab-04/status-filter.api.test.ts` | |
+| API-22 | API | AC-18, BR-27 | `GET /api/staff/tickets?status=NEW,OPEN` | only New and Open Tickets | `server/tests/lab-04/status-filter.api.test.ts` | Pass |
+| API-23 | API | BR-27 | `GET /api/tickets?status=NEW,OPEN,IN_PROGRESS,REOPENED` as Requester | only that Requester's matching Tickets | `server/tests/lab-04/status-filter.api.test.ts` | Pass |
+| API-24 | API | BR-27 | Single value and invalid list token | single unchanged; `NEW,BOGUS` → 400 | `server/tests/lab-04/status-filter.api.test.ts` | Pass |
 
 **requester-dashboard.api.test.ts**
 
@@ -144,9 +145,9 @@ a test at its edge value (max passes, max+1 fails).
 | UI-04 | UI | ui-spec.md §4.3 | Edit row inline, Cancel | fields prefilled; Cancel restores read view without API call | `client/tests/lab-04/ActionsTaken.test.tsx` | |
 | UI-05 | UI | BR-11, AC-06 | Requester view | list shown; no Create form, no Edit control | `client/tests/lab-04/ActionsTaken.test.tsx` | |
 | UI-06 | UI | ui-spec.md §4.3 | Empty tab; API failure | "No actions recorded yet."; safe error with entered form values preserved | `client/tests/lab-04/ActionsTaken.test.tsx` | |
-| UI-07 | UI | ui-spec.md §3, BR-17 | Status write returns 409 | `.ticket-conflict-banner` next to Operations panel; Refresh re-fetches and re-enables controls | `client/tests/lab-04/TicketWorkflow.test.tsx` | |
-| UI-08 | UI | lab-03 ui-spec §5.6 | Status control options | only legal targets from current status listed; Cancelled/Closed open confirm dialog | `client/tests/lab-04/TicketWorkflow.test.tsx` | |
-| UI-09 | UI | FR-13 | Status/owner write sends `expectedUpdatedAt` from last fetch; success refreshes summary status | request body includes it; header status updates | `client/tests/lab-04/TicketWorkflow.test.tsx` | |
+| UI-07 | UI | ui-spec.md §3, BR-17 | Status write returns 409 | `.ticket-conflict-banner` next to Operations panel; Refresh re-fetches and re-enables controls | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
+| UI-08 | UI | lab-03 ui-spec §5.6 | Status control options | only legal targets from current status listed; Cancelled/Closed open confirm dialog | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
+| UI-09 | UI | FR-13 | Status/owner write sends `expectedUpdatedAt` from last fetch; success refreshes summary status | request body includes it; header status updates | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
 | UI-10 | UI | ui-spec.md §4.1 | Staff dashboard renders cards and lists from API | Unassigned, My Assigned, By Status chips, Recently Updated, My Recent Actions Taken | `client/tests/lab-04/StaffDashboard.test.tsx` | |
 | UI-11 | UI | AC-12, BR-23 | Zero-state, loading, forbidden, failure | cards show 0 (not hidden); list empty text; skeleton while loading; forbidden/failure copy | `client/tests/lab-04/StaffDashboard.test.tsx` | |
 | UI-12 | UI | BR-25, api-spec.md §3.1 | Count card drill-down links | each link's href/query equals the api-spec.md §3.1 table | `client/tests/lab-04/StaffDashboard.test.tsx` | |
