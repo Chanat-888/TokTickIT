@@ -132,6 +132,18 @@ Lab 4 adds one new copy variant for the same visual pattern:
   retry after a network failure cannot create a duplicate (BR-13, FR-14);
   the submit button shows "Saving…", is disabled, and ignores repeat clicks
   while a request is in flight. Only one row is edited at a time.
+  If a save is retried after its response was lost and the server answers
+  200 instead of 201 (it had already saved and returned the original row,
+  ignoring the new text, BR-13), the form is not cleared: the saved row
+  appears in the list, the user's text stays in the form, a notice says
+  "This action was already saved and is shown in the list. Your latest text
+  was not applied; it is still in the form.", and the next submit uses a
+  new idempotencyKey so it is a deliberate new action.
+- **Icons**: the Edit control shows a pencil (✎, decorative) plus the
+  visible word "Edit" and `aria-label="Edit this action"`, so it is never
+  icon-only; Attachment Notes on a row are prefixed with a paperclip (📎,
+  decorative) and the label "Attachment notes". The Create form renders
+  above the list.
 - The staff section heading is now "Comments, Notes and Actions Taken"
   (was "Public Comments and Internal Notes") because it holds three tabs.
 - Empty state (zero Actions Taken on this Ticket, either role): "No

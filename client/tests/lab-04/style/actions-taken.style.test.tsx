@@ -129,4 +129,18 @@ describe("Actions Taken style rules (ui-spec.md §2, §4.3, §6)", () => {
 
     expect(screen.getAllByRole("button", { name: "Edit this action" })).toHaveLength(2);
   });
+
+  // ui-spec.md §4.3: the Create form sits above the list; Edit has a pencil icon, Attachment Notes a paperclip
+  it("renders the create form above the list, a pencil on Edit and a paperclip on attachment notes", async () => {
+    setup();
+    await userEvent.click(await screen.findByRole("tab", { name: /Actions Taken/ }));
+
+    const form = screen.getByRole("form", { name: "Add Action Taken" });
+    const list = document.querySelector(".actions-taken-list") as HTMLElement;
+    expect(form.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    const edit = screen.getAllByRole("button", { name: "Edit this action" })[0];
+    expect(edit.querySelector('[aria-hidden="true"]')).toHaveTextContent("✎");
+    expect(edit).toHaveTextContent("Edit");
+  });
 });

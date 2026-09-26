@@ -266,6 +266,32 @@ describe("Actions Taken on Ticket Detail", () => {
     expect(keys[0]).toBe(keys[1]);
   });
 
+  // UI-20 — BR-13: a 200 means an earlier save of this same submission won
+  it("a 200 (already saved) keeps the user's text, says so, shows the saved row, and the next submit uses a new key", async () => {
+    let calls = 0;
+    const fetchMock = setupFetch({
+      post: () => (++calls === 1 ? json(action({ id: 3, description: "Original text" }), 200) : json(action({ id: 4 }), 201)),
+    });
+    renderStaff();
+    await openActionsTab();
+
+    const form = screen.getByRole("form", { name: "Add Action Taken" });
+    await userEvent.type(within(form).getByLabelText(/Description/), "Edited text");
+    await userEvent.type(within(form).getByLabelText(/Result/), "Some result");
+    await userEvent.click(within(form).getByRole("button", { name: "Add Action Taken" }));
+
+    expect(await within(form).findByText(/already saved/)).toBeInTheDocument();
+    expect(within(form).getByLabelText(/Description/)).toHaveValue("Edited text");
+    expect(within(form).getByLabelText(/Result/)).toHaveValue("Some result");
+    await waitFor(() => expect(document.querySelectorAll(".action-taken-entry")).toHaveLength(3));
+    expect(screen.getByText("Original text")).toBeInTheDocument();
+
+    await userEvent.click(within(form).getByRole("button", { name: "Add Action Taken" }));
+    await waitFor(() => expect(writes(fetchMock, "POST")).toHaveLength(2));
+    const keys = writes(fetchMock, "POST").map(([, init]) => JSON.parse(String((init as RequestInit).body)).idempotencyKey);
+    expect(keys[0]).not.toBe(keys[1]);
+  });
+
   it("server field errors (400) are shown beside the matching fields", async () => {
     setupFetch({
       post: () => json({ errors: [{ field: "result", message: "Result must be 2000 characters or fewer" }] }, 400),

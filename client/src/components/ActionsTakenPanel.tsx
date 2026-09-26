@@ -19,13 +19,14 @@ function ActionForm({
 }: {
   mode: "create" | "edit";
   initial: ActionTakenFields;
-  onSubmit: (values: ActionTakenFields, idempotencyKey: string) => Promise<void>;
+  onSubmit: (values: ActionTakenFields, idempotencyKey: string) => Promise<{ alreadySaved: boolean } | void>;
   onCancel?: () => void;
 }) {
   const uid = useId();
   const [values, setValues] = useState<ActionTakenFields>(initial);
   const [errors, setErrors] = useState<ActionFormErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const inFlight = useRef(false);
   const keyRef = useRef<string>(crypto.randomUUID());
@@ -41,15 +42,25 @@ function ActionForm({
     const found = validateActionForm(values);
     setErrors(found);
     setFormError(null);
+    setNotice(null);
     if (Object.keys(found).length > 0) return;
 
     inFlight.current = true;
     setSubmitting(true);
     try {
-      await onSubmit(values, keyRef.current);
+      const result = await onSubmit(values, keyRef.current);
       if (isCreate) {
-        setValues(EMPTY_ACTION_FIELDS);
         keyRef.current = crypto.randomUUID();
+        if (result && result.alreadySaved) {
+          // The server returned an earlier save of this same submission and
+          // ignored the text just sent: keep the user's entries and say so,
+          // rather than clearing the form and silently dropping an edit.
+          setNotice(
+            "This action was already saved and is shown in the list. Your latest text was not applied; it is still in the form.",
+          );
+        } else {
+          setValues(EMPTY_ACTION_FIELDS);
+        }
       }
     } catch (err) {
       if (err instanceof FieldValidationError && err.errors.length > 0) {
@@ -117,6 +128,7 @@ function ActionForm({
       </Field>
 
       {formError && <p className="field__message field__message--error" role="alert">{formError}</p>}
+      {notice && <p className="action-taken-form__notice" role="status">{notice}</p>}
 
       <div className="action-taken-form__buttons">
         <button
@@ -163,7 +175,7 @@ export default function ActionsTakenPanel({
   state: ActionsState;
   canEdit: boolean;
   onRetry: () => void;
-  onCreate: (fields: ActionTakenFields, idempotencyKey: string) => Promise<void>;
+  onCreate: (fields: ActionTakenFields, idempotencyKey: string) => Promise<{ alreadySaved: boolean }>;
   onUpdate: (actionId: number, fields: ActionTakenFields) => Promise<void>;
 }) {
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -171,6 +183,10 @@ export default function ActionsTakenPanel({
   return (
     <div className="actions-taken-panel">
       <p className="actions-taken-panel__header">Actions Taken — visible to the Requester</p>
+
+      {canEdit && state === "loaded" && (
+        <ActionForm mode="create" initial={EMPTY_ACTION_FIELDS} onSubmit={onCreate} />
+      )}
 
       {state === "loading" && <p>Loading actions taken…</p>}
       {state === "error" && (
@@ -215,7 +231,7 @@ export default function ActionsTakenPanel({
                         aria-label="Edit this action"
                         onClick={() => setEditingId(a.id)}
                       >
-                        Edit
+                        <span aria-hidden="true">✎ </span>Edit
                       </button>
                     )}
                   </div>
@@ -232,6 +248,7 @@ export default function ActionsTakenPanel({
                   )}
                   {a.attachmentNotes && (
                     <p className="action-taken-entry__text">
+                      <span aria-hidden="true">📎 </span>
                       <span className="action-taken-entry__label">Attachment notes</span> {a.attachmentNotes}
                     </p>
                   )}
@@ -240,10 +257,6 @@ export default function ActionsTakenPanel({
             )}
           </ul>
         ))}
-
-      {canEdit && state === "loaded" && (
-        <ActionForm mode="create" initial={EMPTY_ACTION_FIELDS} onSubmit={onCreate} />
-      )}
     </div>
   );
 }

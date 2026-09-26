@@ -158,6 +158,7 @@ a test at its edge value (max passes, max+1 fails).
 | UI-17 | UI | BR-13, FR-14 | Save fails (500) then is retried | entered values kept, safe error shown, retry reuses the same `idempotencyKey` | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
 | UI-18 | UI | BR-05, BR-06 | Server 400 field errors | each message shown beside its field | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
 | UI-19 | UI | FR-13 | Actions Taken list fails to load | safe error with "Try again" that reloads | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-20 | UI | BR-13, FR-14 | Create retry answered 200 (already saved) | text kept, "already saved" notice, saved row shown, next submit uses a new `idempotencyKey` | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
 
 ### 2.4 UI Style
 
@@ -167,6 +168,7 @@ a test at its edge value (max passes, max+1 fails).
 | STYLE-02 | Style | ui-spec.md §5.2 | List panel | `.list-panel`, `.list-panel__row` present; rows are keyboard-focusable | `client/tests/lab-04/style/dashboard.style.test.tsx` | |
 | STYLE-03 | Style | ui-spec.md §2 | Follow-up chip | present only when `followUpRequired`; has text label, not colour alone | `client/tests/lab-04/style/actions-taken.style.test.tsx` | Pass |
 | STYLE-04 | Style | ui-spec.md §4.3 | Actions Taken form | required asterisks, labels above controls, validation message adjacent to field, edit-icon `aria-label` | `client/tests/lab-04/style/actions-taken.style.test.tsx` | Pass |
+| STYLE-05 | Style | ui-spec.md §4.3 | Layout and icons | Create form above the list; pencil on Edit; paperclip on attachment notes | `client/tests/lab-04/style/actions-taken.style.test.tsx` | Pass |
 
 ### 2.5 Responsive
 

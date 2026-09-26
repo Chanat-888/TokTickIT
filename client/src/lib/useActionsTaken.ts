@@ -30,10 +30,11 @@ export function useActionsTaken(ticketId: number) {
   }, [reload]);
 
   const create = useCallback(
-    async (fields: ActionTakenFields, idempotencyKey: string) => {
-      const created = await createActionTaken(ticketId, fields, idempotencyKey);
+    async (fields: ActionTakenFields, idempotencyKey: string): Promise<{ alreadySaved: boolean }> => {
+      const { action: created, alreadySaved } = await createActionTaken(ticketId, fields, idempotencyKey);
       // A retried request with the same key returns the original (BR-13).
       setItems((prev) => (prev.some((a) => a.id === created.id) ? prev : [...prev, created]));
+      return { alreadySaved };
     },
     [ticketId],
   );

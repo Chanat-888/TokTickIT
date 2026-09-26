@@ -760,18 +760,21 @@ export async function getActionsTaken(ticketId: number): Promise<ActionTaken[]> 
   return body.data;
 }
 
+// `alreadySaved` is true when the server answered 200: an earlier request with
+// the same idempotencyKey had already saved, so it returned that original row
+// and ignored this request's text (BR-13).
 export async function createActionTaken(
   ticketId: number,
   fields: ActionTakenFields,
   idempotencyKey: string,
-): Promise<ActionTaken> {
+): Promise<{ action: ActionTaken; alreadySaved: boolean }> {
   const res = await apiFetch(`/api/tickets/${ticketId}/actions-taken`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...actionPayload(fields), idempotencyKey }),
   });
   await throwOnActionError(res, "Create Action Taken");
-  return (await res.json()) as ActionTaken;
+  return { action: (await res.json()) as ActionTaken, alreadySaved: res.status === 200 };
 }
 
 export async function updateActionTaken(
