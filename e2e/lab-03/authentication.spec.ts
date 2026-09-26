@@ -70,6 +70,8 @@ test("E2E-04 a migrated Requester's pre-existing Tickets are visible in My Ticke
   page,
 }) => {
   await login(page, SEEDED_USERS.requester.email);
+  // Lab 4: login lands on the Dashboard; My Tickets is one navigation away.
+  await page.goto("/tickets");
 
   await expect(page.locator(".my-tickets")).toBeVisible();
   // At least the seeded 25 — other specs in this same shared, single-worker

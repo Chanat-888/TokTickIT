@@ -464,7 +464,7 @@ following hold on the final `main` branch:
 - All Lab 1-3 tests (`server/tests/lab-0{1,2,3}/*`, the corresponding
   `client/.../lab-0{1,2,3}` component tests, and `e2e/lab-0{1,2,3}/*`)
   still pass unmodified in behavior, proving the regression requirement,
-  except the four tests edited for the contracts and landing screen Lab 4
+  except the five tests edited for the contracts and landing screen Lab 4
   supersedes on purpose (§11.17); every other Lab 1-3 test is untouched.
 - `server/tests/lab-04/*`, the four `client/.../lab-04` component test
   files, and `e2e/lab-04/*` all pass with zero skipped/disabled/todo
@@ -578,7 +578,9 @@ Meaningful choices not already fixed by the handout, each with its reason:
     `selectRequester` login helper (`e2e/lab-02/fixtures.ts`) now waits for
     `/dashboard` and opens `/tickets`, and Lab 3 E2E-01
     (`e2e/lab-03/authentication.spec.ts`) now waits for `/dashboard`
-    instead of `/staff/tickets`. That makes four edited Lab 1-3 tests.
+    instead of `/staff/tickets`, and Lab 3 E2E-04
+    (`e2e/lab-03/authentication.spec.ts`) opens `/tickets` itself instead of
+    expecting to land there. That makes five edited Lab 1-3 tests.
 18. A stale write is detected before the change is judged (api-spec §2 step
     4) as well as by the atomic write (step 6): the pre-check gives stale
     callers the right message, the atomic write closes the race.
