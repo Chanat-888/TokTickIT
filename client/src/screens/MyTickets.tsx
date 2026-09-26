@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   getCategories,
   getTickets,
@@ -15,6 +15,18 @@ import Pagination from "../components/Pagination.js";
 import StateBanner from "../components/StateBanner.js";
 
 type LoadState = "loading" | "loaded" | "error";
+
+// docs/lab-04/api-spec.md §0.4 — the Requester list now accepts every status.
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: "NEW", label: "New" },
+  { value: "OPEN", label: "Open" },
+  { value: "IN_PROGRESS", label: "In Progress" },
+  { value: "WAITING_FOR_REQUESTER", label: "Waiting for Requester" },
+  { value: "RESOLVED", label: "Resolved" },
+  { value: "CLOSED", label: "Closed" },
+  { value: "REOPENED", label: "Reopened" },
+  { value: "CANCELLED", label: "Cancelled" },
+];
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
@@ -43,6 +55,8 @@ function SortIcon({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
 
 export default function MyTickets() {
   const navigate = useNavigate();
+  // BR-25 — a dashboard drill-down link arrives as ?status=A,B,C.
+  const [searchParams] = useSearchParams();
 
   const [categories, setCategories] = useState<Category[]>([]);
 
@@ -50,7 +64,7 @@ export default function MyTickets() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryIdFilter, setCategoryIdFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState(() => searchParams.get("status") ?? "");
 
   const [sortBy, setSortBy] = useState<SortableTicketField>("createdAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -78,7 +92,7 @@ export default function MyTickets() {
       search: debouncedSearch || undefined,
       categoryId: categoryIdFilter ? Number(categoryIdFilter) : undefined,
       requestedPriority: priorityFilter ? (priorityFilter as Priority) : undefined,
-      status: statusFilter ? "NEW" : undefined,
+      status: statusFilter || undefined,
       sortBy,
       sortDir,
       page,
@@ -204,7 +218,12 @@ export default function MyTickets() {
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="">All Statuses</option>
-            <option value="NEW">New</option>
+            {STATUS_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+            {statusFilter.includes(",") && <option value={statusFilter}>Selected statuses</option>}
           </select>
 
           <select

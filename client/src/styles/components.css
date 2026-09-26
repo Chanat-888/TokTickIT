@@ -1169,3 +1169,171 @@ textarea.field__control {
   gap: var(--space-sm);
   flex-wrap: wrap;
 }
+
+/* ---------------------------------------------------------------------------
+   Lab 4 — Dashboards (docs/lab-04/ui-spec.md §4-§6)
+   ------------------------------------------------------------------------- */
+
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-lg);
+}
+
+.dashboard-grid--loading {
+  display: block;
+}
+
+.dashboard-lists {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-lg);
+}
+
+.metric-card,
+.list-panel {
+  position: relative;
+  padding: var(--space-lg);
+  border: 1px solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  box-shadow: 0 1px 2px rgba(28, 43, 35, 0.06);
+}
+
+.metric-card__label,
+.list-panel__title {
+  margin: 0;
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-label);
+  color: var(--color-text-muted);
+}
+
+.list-panel__title {
+  margin-bottom: var(--space-sm);
+  font-size: var(--font-size-h3);
+  color: var(--color-text);
+}
+
+.metric-card__value {
+  margin: var(--space-sm) 0;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.metric-card__link {
+  display: block;
+  text-align: right;
+  color: var(--color-secondary-green);
+  font-size: var(--font-size-small);
+  font-weight: 600;
+}
+
+/* ui-spec.md §5.1 — the whole card is the click target; the anchor stretches over it. */
+.metric-card--clickable {
+  cursor: pointer;
+}
+
+.metric-card--clickable:hover {
+  background: var(--color-pale-green);
+}
+
+.metric-card--clickable .metric-card__link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-control);
+}
+
+.metric-card__link:focus-visible::after,
+.list-panel__row:focus-visible,
+.status-breakdown__chip:focus-visible {
+  outline: 2px solid var(--color-primary-green);
+  outline-offset: 2px;
+}
+
+.status-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.status-breakdown__chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 2px var(--space-sm);
+  border: 1px solid var(--color-field-border);
+  border-radius: var(--radius-badge);
+  background: var(--color-page-bg);
+  color: var(--color-text);
+  font-size: var(--font-size-small);
+  text-decoration: none;
+}
+
+.status-breakdown__chip:hover {
+  background: var(--color-pale-green);
+}
+
+.list-panel__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list-panel__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.list-panel__row:hover {
+  background: var(--color-pale-green);
+}
+
+.list-panel__primary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-panel__time {
+  flex-shrink: 0;
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+
+.list-panel__empty {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+/* ui-spec.md §5.1 — tablet 2 per row, mobile single column. */
+@media (max-width: 991px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .dashboard-grid,
+  .dashboard-lists {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
