@@ -1175,6 +1175,9 @@ textarea.field__control {
    ------------------------------------------------------------------------- */
 
 .dashboard {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--space-xl);
   display: flex;
   flex-direction: column;
   gap: var(--space-xl);

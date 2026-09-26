@@ -1,6 +1,7 @@
 # TokTickIT
 
-An IT service desk ticketing application built for CPE 334 Lab 1.
+An IT service desk ticketing application built for CPE 334, one lab at a time.
+Lab 4 adds Actions Taken on Tickets, safer status changes, and role dashboards.
 
 **Stack:** React + TypeScript + Vite + Bootstrap (frontend) · Node.js + Express + TypeScript + Prisma (backend) · PostgreSQL
 
@@ -79,17 +80,21 @@ npx prisma migrate deploy
 npm run prisma:seed
 ```
 
-This applies all three migrations (Lab 1's `Category` table; Lab 2's
+This applies all four migrations (Lab 1's `Category` table; Lab 2's
 `RequesterUser`, `RelatedSystem`, `Ticket`, and `Attachment` tables; Lab
 3's rename of `RequesterUser` to `User` plus `Session`, `PublicComment`,
-`InternalNote`, and the new `Ticket` workflow columns) and seeds:
+`InternalNote`, and the new `Ticket` workflow columns; Lab 4's
+`ActionTaken` table) and seeds:
 4 Categories, 6 Related Systems, 10 Users (5 Requesters — 4 active, 1
 inactive; 4 IT Staff — 3 active, 1 inactive; 1 active Administrator), and
 ~30 Tickets split 25/5/0 across three of the active Requesters, a subset
 of which are claimed with a mix of IT Priority/status/sample Public
 Comments and Internal Notes. The seed uses `upsert` for reference data and
 is otherwise idempotent — running it more than once produces the same
-counts, not duplicates.
+counts, not duplicates. Lab 4 also seeds Actions Taken on assigned Tickets
+(zero, one, or several per Ticket, by more than one IT Staff member) so both
+dashboards have data; Priya Nair has no Tickets and Taylor Chen records no
+actions, which keeps the dashboard zero states reachable.
 
 **Seeded login (local development only, never a real secret):** every
 seeded account shares the password `ChangeMe123!` and must change it at
@@ -116,7 +121,8 @@ npm run dev
 
 ## Testing
 
-Four independent test suites cover Lab 2:
+Four independent test suites cover Labs 1-4 (each lab's tests live under
+`tests/lab-0N/`, so `npm test` runs every lab as a regression):
 
 ```
 cd server
@@ -161,8 +167,12 @@ commands together confirm the seed itself is idempotent before
 Playwright takes over.
 
 Screenshots from the responsive/visual suite are committed under
-`e2e/lab-02/screenshots/`, organized by screen, matching the fixed
-paths in `docs/lab-02/tests.md` §4.
+`e2e/lab-02/screenshots/` (Lab 2), `artifacts/lab-03/screenshots/` (Lab 3)
+and `artifacts/lab-04/screenshots/` (Lab 4: `staff-dashboard/`,
+`requester-dashboard/`, `actions-taken/`, `ticket-workflow/`), organized by
+screen, matching the paths in each lab's `tests.md`. Run only Lab 4 with
+`npx playwright test lab-04`. After login every role lands on its
+Dashboard; My Tickets and the Ticket Queue are one click away in the nav.
 
 ## Project structure
 
@@ -171,24 +181,35 @@ client/           React + Vite frontend
   src/            Application source
   tests/lab-01/   UI tests (Lab 1)
   tests/lab-02/   UI tests (Lab 2)
+  tests/lab-03/   UI tests (Lab 3)
+  tests/lab-04/   UI tests (Lab 4: Actions Taken, workflow, dashboards)
 server/           Express + Prisma backend
   src/            Application source
   prisma/         Schema, migrations, and seed
   tests/lab-01/   API tests (Lab 1)
   tests/lab-02/   API tests (Lab 2)
+  tests/lab-03/   API tests (Lab 3)
+  tests/lab-04/   API tests (Lab 4)
 e2e/              Playwright E2E and responsive/visual tests
   lab-02/         Specs and committed screenshots
+  lab-03/         Specs (screenshots under artifacts/lab-03/)
+  lab-04/         Specs (screenshots under artifacts/lab-04/)
+artifacts/        Screenshots for Labs 3 and 4
 docs/lab-01/      Lab 1 documentation
 docs/lab-02/      Lab 2 documentation (specification, API spec, UI spec,
                   test plan, AI usage log)
+docs/lab-03/      Lab 3 documentation (same set, plus reviewer log)
+docs/lab-04/      Lab 4 documentation (specification, API spec, UI spec,
+                  test plan, reviewer log)
 ```
 
 ## Branching model
 
 ```
-main  <-  lab2-staging  <-  feature/*
+main  <-  lab4-staging  <-  feature/*
 ```
 
-Feature branches are opened as pull requests into `lab2-staging`. A single
-release pull request merges `lab2-staging` into `main` at the end of each
-lab.
+Feature branches are opened as pull requests into the lab's staging branch
+(`lab4-staging` for Lab 4; earlier labs used `lab2-staging` and
+`lab3-staging`). A single release pull request merges the staging branch
+into `main` at the end of each lab.
