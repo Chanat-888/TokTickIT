@@ -77,7 +77,8 @@ Lab 4 adds one new copy variant for the same visual pattern:
 - Administrator caller only: one additional small "Accounts" card showing
   three counts (Requester / IT Staff / Administrator), same metric-card
   component as the others, each count's drill-down opens User Management
-  pre-filtered by that role (`?role=<role>`, reusing the existing optional
+  pre-filtered by that role and to active accounts (`?role=<role>&isActive=true`;
+  User Management gains an "Account Status" filter for this), reusing the existing optional
   role filter from `docs/lab-03/ui-spec.md` §5.7).
 - States: loading (skeleton cards), empty (all counts legitimately 0 and
   both lists empty — e.g. a brand-new IT Staff account, BR-23 zero-state),

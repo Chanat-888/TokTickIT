@@ -27,8 +27,8 @@ test("E2E-01 login with a must-change-password seeded user forces Change Passwor
   await page.locator("#change-password-confirm").fill("ChangedPassword1");
   await page.locator('button[type="submit"]').click();
 
-  await page.waitForURL("**/staff/tickets");
-  await expect(page.locator(".staff-ticket-queue")).toBeVisible();
+  await page.waitForURL("**/dashboard");
+  await expect(page.locator(".dashboard")).toBeVisible();
 });
 
 // E2E-02 — AC-05, AC-06: invalid login, then a correct-credentials

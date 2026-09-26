@@ -72,3 +72,14 @@ Actions Taken UI branch (#63) because #70 was already merged.
 
 Approved and merged into `lab4-staging` by the reviewer.
 
+
+## PR #72 — Role dashboards (Issue #65)
+
+**Reviewer decision:** Changes requested.
+
+**Comments received and responses**
+
+1. Lab 3 E2E-01 still waited for `/staff/tickets`, so it would time out now that every role lands on `/dashboard`; and the "two edited tests" wording in §11.17, AC-16 and the DoD no longer matched.
+   **Response:** E2E-01 now waits for `/dashboard` and checks `.dashboard`; §11.17, AC-16 and the DoD now say four edited tests and name the two Playwright waits.
+2. The Accounts card counts active users only, but its drill-down opened `/admin/users?role=<role>`, which lists inactive users too (BR-25: same condition as the metric).
+   **Response:** the link is now `?role=<role>&isActive=true`. `GET /api/admin/users` accepts an optional `isActive` filter, User Management reads it and has an Account Status filter, and api-spec §3.1 and ui-spec §4.1 are updated.

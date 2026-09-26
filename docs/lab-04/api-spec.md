@@ -230,12 +230,17 @@ parameters (§0.4):
 | `unassigned` | `GET /api/staff/tickets?ownerId=unassigned&status=NEW,OPEN,IN_PROGRESS,WAITING_FOR_REQUESTER,RESOLVED,REOPENED` |
 | `myAssigned` | `GET /api/staff/tickets?ownerId=<callerId>&status=NEW,OPEN,IN_PROGRESS,WAITING_FOR_REQUESTER,RESOLVED,REOPENED` |
 | `byStatus[<value>]` | `GET /api/staff/tickets?status=<value>` |
-| `accounts[<role>]` | `GET /api/admin/users?role=<role>` |
+| `accounts[<role>]` | `GET /api/admin/users?role=<role>&isActive=true` |
 
 `recentlyUpdated`, `recentlyResolved`, and `myRecentActionsTaken` are not
 count metrics — each row in those lists links directly to its own Ticket
 (`GET /api/staff/tickets/:id` or the Requester's `GET /api/tickets/:id`),
 not to a filtered list.
+
+`GET /api/admin/users` (lab-03 §4) gains one optional query parameter,
+`isActive=true|false` (anything else is 400 with `field: "isActive"`),
+because the `accounts` counts include only active users (BR-22) and the
+drill-down must reproduce that condition (BR-25).
 
 ## 4. HTTP status summary (additions to lab-03 §5)
 

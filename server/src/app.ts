@@ -1707,9 +1707,23 @@ app.get("/api/admin/users", requireAdmin, async (req: Request, res: Response) =>
       role = raw as Role;
     }
 
+    // Lab 4 (api-spec §3.1) — lets the Accounts card drill-down reproduce
+    // its active-users-only count (BR-22, BR-25).
+    let isActive: boolean | undefined;
+    if (req.query.isActive !== undefined) {
+      const raw = String(req.query.isActive);
+      if (raw !== "true" && raw !== "false") {
+        return res.status(400).json({
+          errors: [{ field: "isActive", message: "isActive must be true or false" }],
+        });
+      }
+      isActive = raw === "true";
+    }
+
     const search = req.query.search !== undefined ? String(req.query.search) : undefined;
     const where: Prisma.UserWhereInput = {};
     if (role !== undefined) where.role = role;
+    if (isActive !== undefined) where.isActive = isActive;
     if (search) {
       where.OR = [
         { name: { contains: search, mode: "insensitive" } },

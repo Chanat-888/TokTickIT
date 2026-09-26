@@ -192,4 +192,26 @@ describe("IT Staff / Administrator Dashboard API (docs/lab-04/api-spec.md §3)",
     expect((await request(app).get("/api/dashboard/staff").set("Cookie", await sessionCookieFor(requester.id))).status).toBe(403);
     expect((await request(app).get("/api/dashboard/staff")).status).toBe(401);
   });
+
+  // BR-25 — the Accounts card drill-down reproduces the card's count
+  it("GET /api/admin/users?role=&isActive=true lists exactly the users the Accounts card counted", async () => {
+    await fixtures();
+    const admin = await seedUser("Ada Admin", "ADMINISTRATOR");
+    await seedUser("Taylor Chen", "IT_STAFF");
+    await seedUser("Retired Staff", "IT_STAFF", false);
+    const cookie = await sessionCookieFor(admin.id);
+
+    const card = await request(app).get("/api/dashboard/staff").set("Cookie", cookie);
+    const active = await request(app).get("/api/admin/users?role=IT_STAFF&isActive=true").set("Cookie", cookie);
+    expect(active.status).toBe(200);
+    expect(active.body.data).toHaveLength(card.body.accounts.IT_STAFF);
+    expect(active.body.data.every((u: { isActive: boolean }) => u.isActive)).toBe(true);
+
+    const inactive = await request(app).get("/api/admin/users?isActive=false").set("Cookie", cookie);
+    expect(inactive.body.data.map((u: { name: string }) => u.name)).toEqual(["Retired Staff"]);
+
+    const bad = await request(app).get("/api/admin/users?isActive=maybe").set("Cookie", cookie);
+    expect(bad.status).toBe(400);
+    expect(bad.body.errors[0].field).toBe("isActive");
+  });
 });

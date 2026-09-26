@@ -591,12 +591,14 @@ export async function postNote(ticketId: number, body: string): Promise<Comment>
 export interface AdminUserListParams {
   search?: string;
   role?: Role;
+  isActive?: boolean;
 }
 
 export async function getAdminUsers(params: AdminUserListParams): Promise<User[]> {
   const query = new URLSearchParams();
   if (params.search !== undefined) query.set("search", params.search);
   if (params.role !== undefined) query.set("role", params.role);
+  if (params.isActive !== undefined) query.set("isActive", String(params.isActive));
 
   const qs = query.toString();
   const res = await apiFetch(`/api/admin/users${qs ? `?${qs}` : ""}`);

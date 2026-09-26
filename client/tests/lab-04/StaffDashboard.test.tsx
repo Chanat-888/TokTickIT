@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import AppShell from "../../src/components/AppShell.js";
 import StaffDashboard from "../../src/screens/StaffDashboard.js";
 import StaffTicketQueue from "../../src/screens/StaffTicketQueue.js";
+import UserManagement from "../../src/screens/UserManagement.js";
 import { AuthProvider } from "../../src/lib/authContext.js";
 import App from "../../src/App.js";
 
@@ -184,7 +185,7 @@ describe("IT Staff Dashboard (ui-spec.md §4.1)", () => {
     setupFetch("ADMINISTRATOR", () => json({ ...DASHBOARD, accounts: { REQUESTER: 4, IT_STAFF: 3, ADMINISTRATOR: 1 } }));
     const admin = renderDashboard();
     const accounts = await screen.findByRole("region", { name: "Accounts" });
-    expect(within(accounts).getByRole("link", { name: "IT Staff: 3" })).toHaveAttribute("href", "/admin/users?role=IT_STAFF");
+    expect(within(accounts).getByRole("link", { name: "IT Staff: 3" })).toHaveAttribute("href", "/admin/users?role=IT_STAFF&isActive=true");
     admin.unmount();
 
     setupFetch("IT_STAFF", () => json(DASHBOARD));
@@ -211,5 +212,31 @@ describe("IT Staff Dashboard (ui-spec.md §4.1)", () => {
     expect(await screen.findByRole("heading", { name: "Welcome back, Jordan Blake" })).toBeInTheDocument();
     expect(window.location.pathname).toBe("/dashboard");
     expect(await screen.findByRole("region", { name: "Unassigned" })).toBeInTheDocument();
+  });
+
+  // BR-25 — the Accounts drill-down opens User Management already filtered to active users of that role
+  it("User Management applies ?role=&isActive=true from the Accounts link", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/auth/me")) return json(userOf("ADMINISTRATOR"));
+      if (url.includes("/api/admin/users")) return json({ data: [] });
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={["/admin/users?role=IT_STAFF&isActive=true"]}>
+          <Routes>
+            <Route path="/admin/users" element={<UserManagement />} />
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByLabelText("Account Status")).toHaveValue("true");
+    expect(screen.getByLabelText("Role")).toHaveValue("IT_STAFF");
+    const call = fetchMock.mock.calls.map((c) => String(c[0])).find((u) => u.includes("/api/admin/users"));
+    expect(call).toContain("role=IT_STAFF");
+    expect(call).toContain("isActive=true");
   });
 });

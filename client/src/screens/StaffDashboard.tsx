@@ -121,7 +121,7 @@ export default function StaffDashboard() {
                     <li key={role}>
                       <Link
                         className="status-breakdown__chip"
-                        to={`/admin/users?role=${role}`}
+                        to={`/admin/users?role=${role}&isActive=true`}
                         aria-label={`${label}: ${data.accounts![role]}`}
                       >
                         <span>{label}</span>

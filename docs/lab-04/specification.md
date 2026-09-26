@@ -440,8 +440,9 @@ value (BR-27).
   still shows IT Staff A (BR-09/BR-10).
 - AC-16 Given all Lab 1-3 automated tests, when the Lab 4 test suite runs
   against `main`, then they continue to pass unmodified in behavior,
-  except the two superseded contracts listed in §11.17 (BR-17's required
-  `expectedUpdatedAt`, BR-27's widened Requester `status` filter)
+  except the superseded contracts and landing screen listed in §11.17
+  (BR-17's required `expectedUpdatedAt`, BR-27's widened Requester
+  `status` filter, and the post-login landing moving to the Dashboard)
   (regression, FR-12).
 - AC-17 Given IT Staff holding a Ticket at `updatedAt` T, when the
   Requester uploads an Attachment (bumping `updatedAt`) and IT Staff then
@@ -463,8 +464,8 @@ following hold on the final `main` branch:
 - All Lab 1-3 tests (`server/tests/lab-0{1,2,3}/*`, the corresponding
   `client/.../lab-0{1,2,3}` component tests, and `e2e/lab-0{1,2,3}/*`)
   still pass unmodified in behavior, proving the regression requirement,
-  except the two tests edited for the contracts Lab 4 supersedes on purpose
-  (§11.17); every other Lab 1-3 test is untouched.
+  except the four tests edited for the contracts and landing screen Lab 4
+  supersedes on purpose (§11.17); every other Lab 1-3 test is untouched.
 - `server/tests/lab-04/*`, the four `client/.../lab-04` component test
   files, and `e2e/lab-04/*` all pass with zero skipped/disabled/todo
   tests, from the commands documented in `tests.md`.
@@ -572,7 +573,12 @@ Meaningful choices not already fixed by the handout, each with its reason:
     `expectedUpdatedAt` (BR-17), and Lab 2 `my-tickets.api.test.ts` API-28
     uses an unrecognized status instead of `RESOLVED` (BR-27). AC-16's
     "unmodified in behavior" means every other Lab 1-3 behavior; these two
-    edits are the contract changes themselves.
+    edits are the contract changes themselves. The Dashboard landing
+    (ui-spec §8) changes two Lab 2/3 Playwright waits: the Lab 2
+    `selectRequester` login helper (`e2e/lab-02/fixtures.ts`) now waits for
+    `/dashboard` and opens `/tickets`, and Lab 3 E2E-01
+    (`e2e/lab-03/authentication.spec.ts`) now waits for `/dashboard`
+    instead of `/staff/tickets`. That makes four edited Lab 1-3 tests.
 18. A stale write is detected before the change is judged (api-spec §2 step
     4) as well as by the atomic write (step 6): the pre-check gives stale
     callers the right message, the atomic write closes the race.
