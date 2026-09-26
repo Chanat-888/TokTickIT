@@ -693,3 +693,100 @@ export async function setUserPassword(id: number, newPassword: string): Promise<
   }
   throw new Error(`Set user password failed with status ${res.status}`);
 }
+
+// ---------------------------------------------------------------------------
+// Lab 4 — Actions Taken (docs/lab-04/api-spec.md §1)
+// ---------------------------------------------------------------------------
+
+export interface ActionTaken {
+  id: number;
+  ticketId: number;
+  performedById: number;
+  performedByName: string;
+  description: string;
+  result: string;
+  followUpRequired: boolean;
+  followUpNote: string | null;
+  attachmentNotes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// The five editable fields as the form holds them (text fields are strings,
+// never null); Performed By and the timestamp are set by the server (BR-03/04).
+export interface ActionTakenFields {
+  description: string;
+  result: string;
+  followUpRequired: boolean;
+  followUpNote: string;
+  attachmentNotes: string;
+}
+
+export interface FieldMessage {
+  field: string;
+  message: string;
+}
+
+// Thrown on a 400 so the form can place each message beside its field.
+export class FieldValidationError extends Error {
+  constructor(public readonly errors: FieldMessage[]) {
+    super("Validation failed");
+  }
+}
+
+function actionPayload(fields: ActionTakenFields) {
+  return {
+    description: fields.description,
+    result: fields.result,
+    followUpRequired: fields.followUpRequired,
+    ...(fields.followUpRequired ? { followUpNote: fields.followUpNote } : {}),
+    attachmentNotes: fields.attachmentNotes,
+  };
+}
+
+async function throwOnActionError(res: Response, what: string): Promise<void> {
+  if (res.status === 404) throw new NotFoundError("Not found");
+  if (res.status === 400) {
+    const body = (await res.json().catch(() => ({}))) as { errors?: FieldMessage[] };
+    throw new FieldValidationError(body.errors ?? []);
+  }
+  if (!res.ok) throw new Error(`${what} failed with status ${res.status}`);
+}
+
+export async function getActionsTaken(ticketId: number): Promise<ActionTaken[]> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/actions-taken`);
+  await throwOnActionError(res, "Actions Taken fetch");
+  const body = (await res.json()) as { data: ActionTaken[] };
+  return body.data;
+}
+
+// `alreadySaved` is true when the server answered 200: an earlier request with
+// the same idempotencyKey had already saved, so it returned that original row
+// and ignored this request's text (BR-13).
+export async function createActionTaken(
+  ticketId: number,
+  fields: ActionTakenFields,
+  idempotencyKey: string,
+): Promise<{ action: ActionTaken; alreadySaved: boolean }> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/actions-taken`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...actionPayload(fields), idempotencyKey }),
+  });
+  await throwOnActionError(res, "Create Action Taken");
+  return { action: (await res.json()) as ActionTaken, alreadySaved: res.status === 200 };
+}
+
+export async function updateActionTaken(
+  ticketId: number,
+  actionId: number,
+  fields: ActionTakenFields,
+): Promise<ActionTaken> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/actions-taken/${actionId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(actionPayload(fields)),
+  });
+  await throwOnActionError(res, "Update Action Taken");
+  return (await res.json()) as ActionTaken;
+}

@@ -1068,3 +1068,104 @@ textarea.field__control {
   align-items: center;
   gap: var(--space-sm);
 }
+
+/* ---------------------------------------------------------------------- */
+/* Actions Taken — docs/lab-04/ui-spec.md §2, §4.3, §6                    */
+/* ---------------------------------------------------------------------- */
+
+.actions-taken-panel {
+  padding: var(--space-xl);
+  border: 1px solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.actions-taken-panel__header {
+  margin: 0;
+  font-weight: 600;
+}
+
+.actions-taken-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.action-taken-entry {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-field-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.action-taken-entry__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+
+.action-taken-entry__performer {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* ui-spec.md §2 — the existing Warning token, text-labelled (never colour alone). */
+.action-taken-entry__followup {
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--color-warning-border);
+  border-radius: 999px;
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  font-weight: 600;
+}
+
+.action-taken-entry__edit {
+  margin-left: auto;
+}
+
+.action-taken-entry__text {
+  margin: var(--space-xs) 0 0;
+  white-space: pre-wrap;
+}
+
+.action-taken-entry__label {
+  font-weight: 600;
+  margin-right: var(--space-xs);
+}
+
+.action-taken-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.action-taken-form__checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-weight: 600;
+}
+
+.action-taken-form__notice {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-control);
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+.action-taken-form__buttons {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
