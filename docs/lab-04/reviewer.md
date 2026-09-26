@@ -10,6 +10,7 @@ Per the course workflow guide, the reviewer merges each approved PR; the author 
 |----|--------|------------------|
 | [#68](https://github.com/Chanat-888/TokTickIT/pull/68) | feature/lab4-specs -> lab4-staging | Changes requested (3 comments), fixed in `54897de`, approved, merged by reviewer |
 | [#69](https://github.com/Chanat-888/TokTickIT/pull/69) | feature/lab4-actions-foundation -> lab4-staging | Changes requested (3 comments), fixed in `4879995`, approved, squash-merged by reviewer |
+| [#70](https://github.com/Chanat-888/TokTickIT/pull/70) | feature/lab4-ticket-workflow -> lab4-staging | Changes requested (3 comments), fixed in `2503c88`, approved, merged by reviewer |
 
 ## PR #68 — Sprint 4 engineering contract (Issue #61)
 
@@ -51,3 +52,23 @@ Migration, seed, validation, three endpoints, and the first Lab 4 tests.
    keeps docs for in-progress work on the same feature branch.
 
 Approved and squash-merged into `lab4-staging` by the reviewer.
+
+## PR #70 — Ticket workflow (Issue #64)
+
+Atomic stale-write protection (BR-17), status list filter (BR-27), the updatedAt fix, and the conflict banner.
+
+**Comments received and responses**
+
+1. BR-27 and api-spec §0.4 said a single status value behaves "exactly as before", but the Requester list now
+   accepts `status=RESOLVED` (400 -> 200).
+   **Response:** both now name that one exception.
+2. AC-16 and the Definition of Done said Lab 1-3 tests pass "unmodified", but two Lab 2/3 tests were edited.
+   **Response:** both now point at the two superseded contracts in §11.17.
+3. Nothing proved that attachment *removal* changes `updatedAt`.
+   **Response:** added a removal test (strictly increasing `updatedAt`, then a stale write gets 409).
+
+**Approval note:** BR-27 cited "§11.16-17" but only §11.17 covers the status filter. **Response:** fixed in the
+Actions Taken UI branch (#63) because #70 was already merged.
+
+Approved and merged into `lab4-staging` by the reviewer.
+

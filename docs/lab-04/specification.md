@@ -240,7 +240,7 @@ the reasons given):
   value keeps behaving as before with one exception: the Requester list
   (`GET /api/tickets`) accepted only `NEW` in Lab 2 because `NEW` was then
   the sole status, so `status=RESOLVED` (or any non-`NEW` status) changes
-  from 400 to 200 (§11.16-17). On `GET /api/staff/tickets` a single value
+  from 400 to 200 (§11.17). On `GET /api/staff/tickets` a single value
   is unchanged. This lets a
   dashboard drill-down link (BR-25) reproduce a grouped metric's (BR-20/
   BR-21) exact filter instead of approximating it.

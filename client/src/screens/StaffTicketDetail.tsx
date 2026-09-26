@@ -25,6 +25,8 @@ import { useAuth } from "../lib/authContext.js";
 import { allowedStatusTargets, statusRequiresConfirmation } from "../lib/statusTransitions.js";
 import Badge from "../components/Badge.js";
 import StateBanner from "../components/StateBanner.js";
+import ActionsTakenPanel from "../components/ActionsTakenPanel.js";
+import { useActionsTaken } from "../lib/useActionsTaken.js";
 
 type LoadState = "loading" | "loaded" | "not-found" | "forbidden" | "error";
 
@@ -228,7 +230,8 @@ export default function StaffTicketDetail() {
   const [statusError, setStatusError] = useState<string | null>(null);
   const [pendingStatus, setPendingStatus] = useState<TicketStatus | null>(null);
 
-  const [activeTab, setActiveTab] = useState<"public" | "internal">("public");
+  const [activeTab, setActiveTab] = useState<"public" | "internal" | "actions">("public");
+  const actionsTaken = useActionsTaken(Number(id));
 
   const [commentDraft, setCommentDraft] = useState("");
   const [postingComment, setPostingComment] = useState(false);
@@ -578,7 +581,7 @@ export default function StaffTicketDetail() {
           </section>
 
           <section className="ticket-detail__comments">
-            <h2>Public Comments and Internal Notes</h2>
+            <h2>Comments, Notes and Actions Taken</h2>
             <div className="comment-tabs" role="tablist">
               <button
                 type="button"
@@ -598,6 +601,15 @@ export default function StaffTicketDetail() {
               >
                 Internal Notes
               </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "actions"}
+                className={`btn ${activeTab === "actions" ? "btn--primary" : "btn--tertiary"}`}
+                onClick={() => setActiveTab("actions")}
+              >
+                {actionsTaken.state === "loaded" ? `Actions Taken (${actionsTaken.items.length})` : "Actions Taken"}
+              </button>
             </div>
 
             {activeTab === "public" ? (
@@ -610,6 +622,15 @@ export default function StaffTicketDetail() {
                 posting={postingComment}
                 postError={postCommentError}
                 onPost={handlePostComment}
+              />
+            ) : activeTab === "actions" ? (
+              <ActionsTakenPanel
+                items={actionsTaken.items}
+                state={actionsTaken.state}
+                canEdit
+                onRetry={actionsTaken.reload}
+                onCreate={actionsTaken.create}
+                onUpdate={actionsTaken.update}
               />
             ) : (
               <CommentPanel

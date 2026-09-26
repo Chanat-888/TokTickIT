@@ -139,12 +139,12 @@ a test at its edge value (max passes, max+1 fails).
 
 | Test ID | Type | Requirement/AC | What It Tests | Expected Result | Automated Test File | Final |
 |---|---|---|---|---|---|---|
-| UI-01 | UI | ui-spec.md §4.3 | Staff Actions Taken tab renders list | rows oldest first with description, result, performer, timestamp | `client/tests/lab-04/ActionsTaken.test.tsx` | |
-| UI-02 | UI | BR-06 | Toggle Follow-Up Required | Follow-up Note field appears only when checked; empty submit shows field message; API not called | `client/tests/lab-04/ActionsTaken.test.tsx` | |
-| UI-03 | UI | FR-14 | Submit busy state / double click | button disabled while pending; one API call | `client/tests/lab-04/ActionsTaken.test.tsx` | |
-| UI-04 | UI | ui-spec.md §4.3 | Edit row inline, Cancel | fields prefilled; Cancel restores read view without API call | `client/tests/lab-04/ActionsTaken.test.tsx` | |
-| UI-05 | UI | BR-11, AC-06 | Requester view | list shown; no Create form, no Edit control | `client/tests/lab-04/ActionsTaken.test.tsx` | |
-| UI-06 | UI | ui-spec.md §4.3 | Empty tab; API failure | "No actions recorded yet."; safe error with entered form values preserved | `client/tests/lab-04/ActionsTaken.test.tsx` | |
+| UI-01 | UI | ui-spec.md §4.3 | Staff Actions Taken tab renders list | rows oldest first with description, result, performer, timestamp | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-02 | UI | BR-06 | Toggle Follow-Up Required | Follow-up Note field appears only when checked; empty submit shows field message; API not called | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-03 | UI | FR-14 | Submit busy state / double click | button disabled while pending; one API call | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-04 | UI | ui-spec.md §4.3 | Edit row inline, Cancel | fields prefilled; Cancel restores read view without API call | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-05 | UI | BR-11, AC-06 | Requester view | list shown; no Create form, no Edit control | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-06 | UI | ui-spec.md §4.3 | Empty tab; API failure | "No actions recorded yet."; safe error with entered form values preserved | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
 | UI-07 | UI | ui-spec.md §3, BR-17 | Status write returns 409 | `.ticket-conflict-banner` next to Operations panel; Refresh re-fetches and re-enables controls | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
 | UI-08 | UI | lab-03 ui-spec §5.6 | Status control options | only legal targets from current status listed; Cancelled/Closed open confirm dialog | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
 | UI-09 | UI | FR-13 | Status/owner write sends `expectedUpdatedAt` from last fetch; success refreshes summary status | request body includes it; header status updates | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
@@ -154,6 +154,10 @@ a test at its edge value (max passes, max+1 fails).
 | UI-13 | UI | AC-14 | Accounts card | shown for Administrator only | `client/tests/lab-04/StaffDashboard.test.tsx` | |
 | UI-14 | UI | ui-spec.md §4.2 | Requester dashboard cards, lists, drill-down, states | counts, both lists, links to My Tickets with status query, empty state for zero Tickets | `client/tests/lab-04/RequesterDashboard.test.tsx` | |
 | UI-15 | UI | ui-spec.md §4 | Nav and landing | Dashboard nav entry active; landing screen per role after login | `client/tests/lab-04/StaffDashboard.test.tsx` | |
+| UI-16 | UI | AC-01, BR-13 | Valid create from the form | POST carries the fields and a UUID `idempotencyKey`; row appended; tab count and form reset | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-17 | UI | BR-13, FR-14 | Save fails (500) then is retried | entered values kept, safe error shown, retry reuses the same `idempotencyKey` | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-18 | UI | BR-05, BR-06 | Server 400 field errors | each message shown beside its field | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-19 | UI | FR-13 | Actions Taken list fails to load | safe error with "Try again" that reloads | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
 
 ### 2.4 UI Style
 
@@ -161,8 +165,8 @@ a test at its edge value (max passes, max+1 fails).
 |---|---|---|---|---|---|---|
 | STYLE-01 | Style | ui-spec.md §6 | Metric card classes | `.dashboard-grid`, `.metric-card`, `.metric-card__value`, `.metric-card__link` present; `0` value still rendered | `client/tests/lab-04/style/dashboard.style.test.tsx` | |
 | STYLE-02 | Style | ui-spec.md §5.2 | List panel | `.list-panel`, `.list-panel__row` present; rows are keyboard-focusable | `client/tests/lab-04/style/dashboard.style.test.tsx` | |
-| STYLE-03 | Style | ui-spec.md §2 | Follow-up chip | present only when `followUpRequired`; has text label, not colour alone | `client/tests/lab-04/style/actions-taken.style.test.tsx` | |
-| STYLE-04 | Style | ui-spec.md §4.3 | Actions Taken form | required asterisks, labels above controls, validation message adjacent to field, edit-icon `aria-label` | `client/tests/lab-04/style/actions-taken.style.test.tsx` | |
+| STYLE-03 | Style | ui-spec.md §2 | Follow-up chip | present only when `followUpRequired`; has text label, not colour alone | `client/tests/lab-04/style/actions-taken.style.test.tsx` | Pass |
+| STYLE-04 | Style | ui-spec.md §4.3 | Actions Taken form | required asterisks, labels above controls, validation message adjacent to field, edit-icon `aria-label` | `client/tests/lab-04/style/actions-taken.style.test.tsx` | Pass |
 
 ### 2.5 Responsive
 

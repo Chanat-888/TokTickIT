@@ -31,6 +31,8 @@ import { getAttachmentError } from "../lib/attachmentValidation.js";
 import AttachmentPicker from "../components/AttachmentPicker.js";
 import Badge from "../components/Badge.js";
 import StateBanner from "../components/StateBanner.js";
+import ActionsTakenPanel from "../components/ActionsTakenPanel.js";
+import { useActionsTaken } from "../lib/useActionsTaken.js";
 
 type LoadState = "loading" | "loaded" | "not-found" | "error";
 
@@ -329,6 +331,7 @@ function PublicCommentsPanel({
 export default function TicketDetail() {
   const { id } = useParams<{ id: string }>();
 
+  const actionsTaken = useActionsTaken(Number(id));
   const [categories, setCategories] = useState<Category[]>([]);
   const [relatedSystems, setRelatedSystems] = useState<RelatedSystem[]>([]);
 
@@ -715,6 +718,18 @@ export default function TicketDetail() {
               {resolveError && <p className="field__message field__message--error">{resolveError}</p>}
             </section>
           )}
+
+          <section className="ticket-detail__actions">
+            <h2>Actions Taken</h2>
+            <ActionsTakenPanel
+              items={actionsTaken.items}
+              state={actionsTaken.state}
+              canEdit={false}
+              onRetry={actionsTaken.reload}
+              onCreate={actionsTaken.create}
+              onUpdate={actionsTaken.update}
+            />
+          </section>
 
           <PublicCommentsPanel
             state={commentsState}

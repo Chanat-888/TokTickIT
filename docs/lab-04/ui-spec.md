@@ -117,8 +117,23 @@ Lab 4 adds one new copy variant for the same visual pattern:
     (busy-state pattern from `docs/lab-02/ui-spec.md` §7).
   - Validation messages render beside each field (BR-05/BR-06/BR-07),
     matching the existing field-level placement rule.
-- **Requester Ticket Detail**: the same tab and the same row rendering,
-  read-only — no Create form, no Edit action, per BR-11.
+- **Requester Ticket Detail**: the same row rendering, read-only — no
+  Create form, no Edit action, per BR-11. The Requester screen has no tab
+  bar (it only ever had the Public Comments panel), so Actions Taken is a
+  section titled "Actions Taken" between Attachments and Public Comments
+  rather than a tab.
+- **Component and states**: one shared `ActionsTakenPanel` serves both
+  screens (`canEdit` on for staff). The tab label is "Actions Taken (N)"
+  once loaded (plain "Actions Taken" while loading or after a failed
+  load). A failed list load shows "Couldn't load actions taken." with a
+  "Try again" button; a failed save shows "Couldn't save this action. Your
+  entries are kept — please try again." and keeps every entered value.
+  Create keeps one `idempotencyKey` per form until a save succeeds, so a
+  retry after a network failure cannot create a duplicate (BR-13, FR-14);
+  the submit button shows "Saving…", is disabled, and ignores repeat clicks
+  while a request is in flight. Only one row is edited at a time.
+- The staff section heading is now "Comments, Notes and Actions Taken"
+  (was "Public Comments and Internal Notes") because it holds three tabs.
 - Empty state (zero Actions Taken on this Ticket, either role): "No
   actions recorded yet." text inside the tab, no illustration needed
   (matches the plain-text empty-state style already used elsewhere).
