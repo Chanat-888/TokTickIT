@@ -19,7 +19,7 @@ import { getPrisma } from "./prisma.js";
 import { generateTicketNumber } from "./ticketNumber.js";
 import { validateTicketInput } from "./ticketValidation.js";
 import { validateActionFields, type FieldError } from "./actionTakenValidation.js";
-import { parseStatusList, type TicketStatusValue } from "./statusFilter.js";
+import { parseStatusList, TICKET_STATUSES, type TicketStatusValue } from "./statusFilter.js";
 import { storeUploadedFile, UPLOADS_DIR } from "./uploads.js";
 import {
   SESSION_COOKIE_NAME,
@@ -1581,6 +1581,106 @@ app.patch("/api/tickets/:id/actions-taken/:actionId", requireStaff, async (req: 
     return res.status(200).json(actionTakenToJSON(updated));
   } catch (err) {
     console.error(`PATCH /api/tickets/${req.params.id}/actions-taken/${req.params.actionId} failed:`, err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Lab 4 — Dashboards (docs/lab-04/api-spec.md §3, BR-19..BR-23)
+// ---------------------------------------------------------------------------
+
+const DASHBOARD_LIST_SIZE = 5;
+const REQUESTER_OPEN_STATUSES: TicketStatusValue[] = ["NEW", "OPEN", "IN_PROGRESS", "REOPENED"];
+const TERMINAL_STATUSES: TicketStatusValue[] = ["CLOSED", "CANCELLED"];
+
+function ticketSummaryToJSON(t: Ticket) {
+  return {
+    id: t.id,
+    ticketNumber: t.ticketNumber,
+    summary: t.summary,
+    status: t.status,
+    updatedAt: t.updatedAt.toISOString(),
+  };
+}
+
+// BR-19: scoped to the session user; no requesterId parameter is read.
+app.get("/api/dashboard/requester", requireRequester, async (req: Request, res: Response) => {
+  try {
+    const requesterId = req.user!.id;
+    const prisma = getPrisma();
+    const byRecency: Prisma.TicketOrderByWithRelationInput[] = [{ updatedAt: "desc" }, { id: "desc" }];
+
+    const [myOpenTickets, waitingForRequester, recentlyUpdated, recentlyResolved] = await Promise.all([
+      prisma.ticket.count({ where: { requesterId, status: { in: REQUESTER_OPEN_STATUSES } } }),
+      prisma.ticket.count({ where: { requesterId, status: "WAITING_FOR_REQUESTER" } }),
+      prisma.ticket.findMany({ where: { requesterId }, orderBy: byRecency, take: DASHBOARD_LIST_SIZE }),
+      prisma.ticket.findMany({
+        where: { requesterId, status: { in: ["RESOLVED", "CLOSED"] } },
+        orderBy: byRecency,
+        take: DASHBOARD_LIST_SIZE,
+      }),
+    ]);
+
+    return res.status(200).json({
+      myOpenTickets,
+      waitingForRequester,
+      recentlyUpdated: recentlyUpdated.map(ticketSummaryToJSON),
+      recentlyResolved: recentlyResolved.map(ticketSummaryToJSON),
+    });
+  } catch (err) {
+    console.error("GET /api/dashboard/requester failed:", err);
+    res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
+app.get("/api/dashboard/staff", requireStaff, async (req: Request, res: Response) => {
+  try {
+    const caller = req.user!;
+    const prisma = getPrisma();
+    const isAdmin = caller.role === "ADMINISTRATOR";
+
+    const [unassigned, myAssigned, statusGroups, recentlyUpdated, recentActions, roleGroups] = await Promise.all([
+      prisma.ticket.count({ where: { ownerId: null, status: { notIn: TERMINAL_STATUSES } } }),
+      prisma.ticket.count({ where: { ownerId: caller.id, status: { notIn: TERMINAL_STATUSES } } }),
+      prisma.ticket.groupBy({ by: ["status"], _count: { _all: true } }),
+      prisma.ticket.findMany({ orderBy: [{ updatedAt: "desc" }, { id: "desc" }], take: DASHBOARD_LIST_SIZE }),
+      prisma.actionTaken.findMany({
+        where: { performedById: caller.id },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: DASHBOARD_LIST_SIZE,
+        include: { ticket: { select: { ticketNumber: true } } },
+      }),
+      isAdmin
+        ? prisma.user.groupBy({ by: ["role"], where: { isActive: true }, _count: { _all: true } })
+        : Promise.resolve(null),
+    ]);
+
+    // BR-21/BR-23: every status key is always present, zero included.
+    const byStatus = Object.fromEntries(TICKET_STATUSES.map((s) => [s, 0])) as Record<TicketStatusValue, number>;
+    for (const g of statusGroups) byStatus[g.status] = g._count._all;
+
+    let accounts: Record<Role, number> | null = null;
+    if (roleGroups) {
+      accounts = { REQUESTER: 0, IT_STAFF: 0, ADMINISTRATOR: 0 };
+      for (const g of roleGroups) accounts[g.role] = g._count._all;
+    }
+
+    return res.status(200).json({
+      unassigned,
+      myAssigned,
+      byStatus,
+      recentlyUpdated: recentlyUpdated.map(ticketSummaryToJSON),
+      myRecentActionsTaken: recentActions.map((a) => ({
+        id: a.id,
+        ticketId: a.ticketId,
+        ticketNumber: a.ticket.ticketNumber,
+        description: a.description,
+        createdAt: a.createdAt.toISOString(),
+      })),
+      accounts,
+    });
+  } catch (err) {
+    console.error("GET /api/dashboard/staff failed:", err);
     res.status(500).json({ error: "Unexpected server error" });
   }
 });

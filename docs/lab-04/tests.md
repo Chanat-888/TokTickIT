@@ -109,22 +109,22 @@ a test at its edge value (max passes, max+1 fails).
 
 | Test ID | Type | Requirement/AC | What It Tests | Expected Result | Automated Test File | Final |
 |---|---|---|---|---|---|---|
-| API-25 | API | AC-02, BR-19 | Requester A `GET /api/dashboard/requester`, `requesterId` query set to B | only A's data; parameter ignored | `server/tests/lab-04/requester-dashboard.api.test.ts` | |
-| API-26 | API | BR-20 | Counts and lists vs. a direct DB query for seeded Requester | `myOpenTickets`, `waitingForRequester` equal DB counts; lists ≤5, ordered by `updatedAt` desc; resolved list only Resolved/Closed | `server/tests/lab-04/requester-dashboard.api.test.ts` | |
-| API-27 | API | AC-13 | Requester with zero Tickets | 200; both counts 0; both lists `[]` | `server/tests/lab-04/requester-dashboard.api.test.ts` | |
-| API-28 | API | api-spec.md §3 | Staff/Admin session calls requester dashboard; no session | 403; 401 | `server/tests/lab-04/requester-dashboard.api.test.ts` | |
-| API-29 | API | BR-20 | Requester with 7 recently updated Tickets | list capped at 5 | `server/tests/lab-04/requester-dashboard.api.test.ts` | |
+| API-25 | API | AC-02, BR-19 | Requester A `GET /api/dashboard/requester`, `requesterId` query set to B | only A's data; parameter ignored | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| API-26 | API | BR-20 | Counts and lists vs. a direct DB query for seeded Requester | `myOpenTickets`, `waitingForRequester` equal DB counts; lists ≤5, ordered by `updatedAt` desc; resolved list only Resolved/Closed | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| API-27 | API | AC-13 | Requester with zero Tickets | 200; both counts 0; both lists `[]` | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| API-28 | API | api-spec.md §3 | Staff/Admin session calls requester dashboard; no session | 403; 401 | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| API-29 | API | BR-20 | Requester with 7 recently updated Tickets | list capped at 5 | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
 
 **staff-dashboard.api.test.ts**
 
 | Test ID | Type | Requirement/AC | What It Tests | Expected Result | Automated Test File | Final |
 |---|---|---|---|---|---|---|
-| API-30 | API | AC-11, BR-21 | 2 unassigned + 1 owned non-terminal Tickets for caller | `unassigned` counts, `myAssigned` = 1; terminal-status Tickets excluded | `server/tests/lab-04/staff-dashboard.api.test.ts` | |
-| API-31 | API | BR-21, BR-23 | `byStatus` | all 8 keys present, zeros included, equals DB group counts | `server/tests/lab-04/staff-dashboard.api.test.ts` | |
-| API-32 | API | AC-12 | Staff user with zero owned Tickets and zero actions | `myAssigned:0`, `myRecentActionsTaken:[]` | `server/tests/lab-04/staff-dashboard.api.test.ts` | |
-| API-33 | API | BR-21 | `myRecentActionsTaken` | only caller's actions, newest first, ≤5, includes `ticketNumber` | `server/tests/lab-04/staff-dashboard.api.test.ts` | |
-| API-34 | API | AC-14, BR-22 | Administrator vs. IT Staff response | Admin has `accounts` with active-user counts by role; IT Staff `accounts: null` | `server/tests/lab-04/staff-dashboard.api.test.ts` | |
-| API-35 | API | api-spec.md §3 | Requester/no session calls staff dashboard | 403; 401 | `server/tests/lab-04/staff-dashboard.api.test.ts` | |
+| API-30 | API | AC-11, BR-21 | 2 unassigned + 1 owned non-terminal Tickets for caller | `unassigned` counts, `myAssigned` = 1; terminal-status Tickets excluded | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| API-31 | API | BR-21, BR-23 | `byStatus` | all 8 keys present, zeros included, equals DB group counts | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| API-32 | API | AC-12 | Staff user with zero owned Tickets and zero actions | `myAssigned:0`, `myRecentActionsTaken:[]` | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| API-33 | API | BR-21 | `myRecentActionsTaken` | only caller's actions, newest first, ≤5, includes `ticketNumber` | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| API-34 | API | AC-14, BR-22 | Administrator vs. IT Staff response | Admin has `accounts` with active-user counts by role; IT Staff `accounts: null` | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| API-35 | API | api-spec.md §3 | Requester/no session calls staff dashboard | 403; 401 | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
 
 **migration-regression.api.test.ts**
 
@@ -148,12 +148,12 @@ a test at its edge value (max passes, max+1 fails).
 | UI-07 | UI | ui-spec.md §3, BR-17 | Status write returns 409 | `.ticket-conflict-banner` next to Operations panel; Refresh re-fetches and re-enables controls | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
 | UI-08 | UI | lab-03 ui-spec §5.6 | Status control options | only legal targets from current status listed; Cancelled/Closed open confirm dialog | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
 | UI-09 | UI | FR-13 | Status/owner write sends `expectedUpdatedAt` from last fetch; success refreshes summary status | request body includes it; header status updates | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
-| UI-10 | UI | ui-spec.md §4.1 | Staff dashboard renders cards and lists from API | Unassigned, My Assigned, By Status chips, Recently Updated, My Recent Actions Taken | `client/tests/lab-04/StaffDashboard.test.tsx` | |
-| UI-11 | UI | AC-12, BR-23 | Zero-state, loading, forbidden, failure | cards show 0 (not hidden); list empty text; skeleton while loading; forbidden/failure copy | `client/tests/lab-04/StaffDashboard.test.tsx` | |
-| UI-12 | UI | BR-25, api-spec.md §3.1 | Count card drill-down links | each link's href/query equals the api-spec.md §3.1 table | `client/tests/lab-04/StaffDashboard.test.tsx` | |
-| UI-13 | UI | AC-14 | Accounts card | shown for Administrator only | `client/tests/lab-04/StaffDashboard.test.tsx` | |
-| UI-14 | UI | ui-spec.md §4.2 | Requester dashboard cards, lists, drill-down, states | counts, both lists, links to My Tickets with status query, empty state for zero Tickets | `client/tests/lab-04/RequesterDashboard.test.tsx` | |
-| UI-15 | UI | ui-spec.md §4 | Nav and landing | Dashboard nav entry active; landing screen per role after login | `client/tests/lab-04/StaffDashboard.test.tsx` | |
+| UI-10 | UI | ui-spec.md §4.1 | Staff dashboard renders cards and lists from API | Unassigned, My Assigned, By Status chips, Recently Updated, My Recent Actions Taken | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-11 | UI | AC-12, BR-23 | Zero-state, loading, forbidden, failure | cards show 0 (not hidden); list empty text; skeleton while loading; forbidden/failure copy | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-12 | UI | BR-25, api-spec.md §3.1 | Count card drill-down links | each link's href/query equals the api-spec.md §3.1 table | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-13 | UI | AC-14 | Accounts card | shown for Administrator only | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-14 | UI | ui-spec.md §4.2 | Requester dashboard cards, lists, drill-down, states | counts, both lists, links to My Tickets with status query, empty state for zero Tickets | `client/tests/lab-04/RequesterDashboard.test.tsx` | Pass |
+| UI-15 | UI | ui-spec.md §4 | Nav and landing | Dashboard nav entry active; landing screen per role after login | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
 | UI-16 | UI | AC-01, BR-13 | Valid create from the form | POST carries the fields and a UUID `idempotencyKey`; row appended; tab count and form reset | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
 | UI-17 | UI | BR-13, FR-14 | Save fails (500) then is retried | entered values kept, safe error shown, retry reuses the same `idempotencyKey` | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
 | UI-18 | UI | BR-05, BR-06 | Server 400 field errors | each message shown beside its field | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
@@ -164,8 +164,8 @@ a test at its edge value (max passes, max+1 fails).
 
 | Test ID | Type | Requirement/AC | What It Tests | Expected Result | Automated Test File | Final |
 |---|---|---|---|---|---|---|
-| STYLE-01 | Style | ui-spec.md §6 | Metric card classes | `.dashboard-grid`, `.metric-card`, `.metric-card__value`, `.metric-card__link` present; `0` value still rendered | `client/tests/lab-04/style/dashboard.style.test.tsx` | |
-| STYLE-02 | Style | ui-spec.md §5.2 | List panel | `.list-panel`, `.list-panel__row` present; rows are keyboard-focusable | `client/tests/lab-04/style/dashboard.style.test.tsx` | |
+| STYLE-01 | Style | ui-spec.md §6 | Metric card classes | `.dashboard-grid`, `.metric-card`, `.metric-card__value`, `.metric-card__link` present; `0` value still rendered | `client/tests/lab-04/style/dashboard.style.test.tsx` | Pass |
+| STYLE-02 | Style | ui-spec.md §5.2 | List panel | `.list-panel`, `.list-panel__row` present; rows are keyboard-focusable | `client/tests/lab-04/style/dashboard.style.test.tsx` | Pass |
 | STYLE-03 | Style | ui-spec.md §2 | Follow-up chip | present only when `followUpRequired`; has text label, not colour alone | `client/tests/lab-04/style/actions-taken.style.test.tsx` | Pass |
 | STYLE-04 | Style | ui-spec.md §4.3 | Actions Taken form | required asterisks, labels above controls, validation message adjacent to field, edit-icon `aria-label` | `client/tests/lab-04/style/actions-taken.style.test.tsx` | Pass |
 | STYLE-05 | Style | ui-spec.md §4.3 | Layout and icons | Create form above the list; pencil on Edit; paperclip on attachment notes | `client/tests/lab-04/style/actions-taken.style.test.tsx` | Pass |

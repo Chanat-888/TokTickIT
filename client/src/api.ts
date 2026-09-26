@@ -214,7 +214,8 @@ export interface TicketListParams {
   search?: string;
   categoryId?: number;
   requestedPriority?: Priority;
-  status?: "NEW";
+  // docs/lab-04/api-spec.md §0.4 — one status, or a comma-separated list.
+  status?: string;
   sortBy?: string;
   sortDir?: "asc" | "desc";
   page?: number;
@@ -328,7 +329,8 @@ export interface StaffTicketListResult {
 
 export interface StaffTicketListParams {
   search?: string;
-  status?: TicketStatus;
+  // docs/lab-04/api-spec.md §0.4 — one status, or a comma-separated list.
+  status?: string;
   itPriority?: Priority;
   ownerId?: number | "unassigned";
   sortBy?: string;
@@ -789,4 +791,59 @@ export async function updateActionTaken(
   });
   await throwOnActionError(res, "Update Action Taken");
   return (await res.json()) as ActionTaken;
+}
+
+// ---------------------------------------------------------------------------
+// Lab 4 — Dashboards (docs/lab-04/api-spec.md §3).
+// ---------------------------------------------------------------------------
+
+export interface TicketSummary {
+  id: number;
+  ticketNumber: string;
+  summary: string;
+  status: TicketStatus;
+  updatedAt: string;
+}
+
+export interface RequesterDashboard {
+  myOpenTickets: number;
+  waitingForRequester: number;
+  recentlyUpdated: TicketSummary[];
+  recentlyResolved: TicketSummary[];
+}
+
+export interface ActionTakenSummary {
+  id: number;
+  ticketId: number;
+  ticketNumber: string;
+  description: string;
+  createdAt: string;
+}
+
+export interface StaffDashboard {
+  unassigned: number;
+  myAssigned: number;
+  byStatus: Record<TicketStatus, number>;
+  recentlyUpdated: TicketSummary[];
+  myRecentActionsTaken: ActionTakenSummary[];
+  // Present only for an Administrator caller (BR-22).
+  accounts: Record<Role, number> | null;
+}
+
+// A non-2xx status is thrown with its code in the message, like the list
+// fetchers, so a screen can tell forbidden (403) from a failure.
+export async function getRequesterDashboard(): Promise<RequesterDashboard> {
+  const res = await apiFetch("/api/dashboard/requester");
+  if (!res.ok) {
+    throw new Error(`Requester dashboard fetch failed with status ${res.status}`);
+  }
+  return (await res.json()) as RequesterDashboard;
+}
+
+export async function getStaffDashboard(): Promise<StaffDashboard> {
+  const res = await apiFetch("/api/dashboard/staff");
+  if (!res.ok) {
+    throw new Error(`Staff dashboard fetch failed with status ${res.status}`);
+  }
+  return (await res.json()) as StaffDashboard;
 }

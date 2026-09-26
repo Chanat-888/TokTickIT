@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   createUser,
   getAdminUsers,
@@ -33,13 +34,18 @@ function StatusPill({ isActive }: { isActive: boolean }) {
 
 export default function UserManagement() {
   const { user: currentUser } = useAuth();
+  // BR-25 — the Accounts card on the Administrator Dashboard links here as ?role=<role>.
+  const [searchParams] = useSearchParams();
 
   const [users, setUsers] = useState<User[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
 
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState<Role | "">("");
+  const [roleFilter, setRoleFilter] = useState<Role | "">(() => {
+    const role = searchParams.get("role");
+    return role !== null && role in ROLE_LABEL ? (role as Role) : "";
+  });
 
   const [panelMode, setPanelMode] = useState<PanelMode>("none");
   const [editingUser, setEditingUser] = useState<User | null>(null);

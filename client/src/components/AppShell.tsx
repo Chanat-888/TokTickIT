@@ -31,6 +31,9 @@ export default function AppShell({ children }: AppShellProps) {
         <span>TokTickIT</span>
 
         <nav className="app-shell__nav" aria-label="Primary">
+          <NavLink to="/dashboard" className={navLinkClassName}>
+            Dashboard
+          </NavLink>
           {user?.role === "REQUESTER" && (
             <>
               <NavLink to="/tickets" end className={navLinkClassName}>
