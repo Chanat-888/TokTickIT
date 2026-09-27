@@ -11,6 +11,9 @@ Per the course workflow guide, the reviewer merges each approved PR; the author 
 | [#68](https://github.com/Chanat-888/TokTickIT/pull/68) | feature/lab4-specs -> lab4-staging | Changes requested (3 comments), fixed in `54897de`, approved, merged by reviewer |
 | [#69](https://github.com/Chanat-888/TokTickIT/pull/69) | feature/lab4-actions-foundation -> lab4-staging | Changes requested (3 comments), fixed in `4879995`, approved, squash-merged by reviewer |
 | [#70](https://github.com/Chanat-888/TokTickIT/pull/70) | feature/lab4-ticket-workflow -> lab4-staging | Changes requested (3 comments), fixed in `2503c88`, approved, merged by reviewer |
+| [#71](https://github.com/Chanat-888/TokTickIT/pull/71) | feature/lab4-actions-ui -> lab4-staging | Changes requested (2 comments), fixed in `7d072ec`, approved, merged by reviewer |
+| [#72](https://github.com/Chanat-888/TokTickIT/pull/72) | feature/lab4-dashboards -> lab4-staging | Changes requested (2 comments), fixed in `c00ba24`, approved, merged by reviewer |
+| [#73](https://github.com/Chanat-888/TokTickIT/pull/73) | feature/lab4-hardening -> lab4-staging | Approved (non-blocking note), merged by reviewer |
 
 ## PR #68 — Sprint 4 engineering contract (Issue #61)
 
@@ -73,6 +76,27 @@ Actions Taken UI branch (#63) because #70 was already merged.
 Approved and merged into `lab4-staging` by the reviewer.
 
 
+## PR #71 — Actions Taken UI (Issue #63)
+
+Ticket Detail Actions Taken list/create/inline-edit UI, Requester read-only view.
+
+**Comments received and responses**
+
+1. ui-spec §4.3 said the Create form sits above the list with a pencil icon for Edit and a paperclip icon for
+   Attachment Notes; this PR rendered the form below the list and used text instead of icons, while also editing
+   §4.3 to match the code.
+   **Response:** fixed in the code, not the spec. The Create form now renders above the list, Edit shows a pencil
+   icon (plus the visible word "Edit" and an aria-label, never icon-only), and Attachment Notes show a paperclip
+   icon. STYLE-05 asserts the order and icons; ui-spec §4.3 records the icon-plus-text choice.
+2. On a lost-response retry, a 200 (idempotent replay) returned the original row and cleared the form, silently
+   discarding the user's edited text with no message.
+   **Response:** the client now distinguishes 200 from 201 — on 200 the form keeps the text, the saved row shows
+   in the list, and a notice reads "This action was already saved and is shown in the list. Your latest text was
+   not applied; it is still in the form." The idempotency key also rotates so the next submit is a deliberate new
+   action. UI-20 covers all three steps; ui-spec §4.3 documents the behaviour.
+
+Approved and merged into `lab4-staging` by the reviewer.
+
 ## PR #72 — Role dashboards (Issue #65)
 
 **Reviewer decision:** Changes requested.
@@ -83,3 +107,18 @@ Approved and merged into `lab4-staging` by the reviewer.
    **Response:** E2E-01 now waits for `/dashboard` and checks `.dashboard`; §11.17, AC-16 and the DoD now say four edited tests and name the two Playwright waits.
 2. The Accounts card counts active users only, but its drill-down opened `/admin/users?role=<role>`, which lists inactive users too (BR-25: same condition as the metric).
    **Response:** the link is now `?role=<role>&isActive=true`. `GET /api/admin/users` accepts an optional `isActive` filter, User Management reads it and has an Account Status filter, and api-spec §3.1 and ui-spec §4.1 are updated.
+
+Approved and merged into `lab4-staging` by the reviewer.
+
+## PR #73 — Final hardening and regression (Issue #66)
+
+Full Labs 1-3 regression pass, responsive/a11y checks, screenshots, README updates, `tests.md` final pass status.
+
+**Reviewer decision:** Approved (non-blocking note only).
+
+**Approval note:** the dashboard screenshots show tickets created by the e2e runs ("Lab 4 screenshot ticket",
+"E2E-07…"); if the report needs clean data, re-take them on a fresh seed before the final PDF.
+**Response:** non-blocking, so merged as-is; carried forward as a to-do for the submission PDF assembly step
+(Issue #67).
+
+Approved and merged into `lab4-staging` by the reviewer.
