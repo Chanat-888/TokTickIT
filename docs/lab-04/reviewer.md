@@ -80,6 +80,8 @@ Approved and merged into `lab4-staging` by the reviewer.
 
 Ticket Detail Actions Taken list/create/inline-edit UI, Requester read-only view.
 
+**Reviewer decision:** Changes requested.
+
 **Comments received and responses**
 
 1. ui-spec §4.3 said the Create form sits above the list with a pencil icon for Edit and a paperclip icon for
