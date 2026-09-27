@@ -185,7 +185,7 @@ function AttachmentRow({
     <li
       className={`attachment-item ${attachment.isRemoved ? "attachment-item--removed" : "attachment-item--active"}${disabled ? " attachment-item--unavailable" : ""}`}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-md)" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "var(--space-md)" }}>
         <span className="attachment-item__name">{attachment.originalFilename}</span>
         <span className="attachment-item__meta">
           {formatSize(attachment.sizeBytes)} · Uploaded {formatDate(attachment.createdAt)}
@@ -199,7 +199,7 @@ function AttachmentRow({
         </span>
 
         {!attachment.isRemoved && (
-          <span style={{ display: "flex", gap: "var(--space-sm)" }}>
+          <span style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-sm)" }}>
             <a
               className="btn btn--tertiary attachment-item__preview-btn"
               href={href}

@@ -7,11 +7,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import request from "supertest";
+import { sessionCookieFor } from "../authHelpers.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const serverRoot = path.join(__dirname, "..", "..");
 const migrationsDir = path.join(serverRoot, "prisma", "migrations");
 
+const { app } = await import("../../src/app.js");
 const { getPrisma } = await import("../../src/prisma.js");
 
 async function truncateAll() {
@@ -168,5 +171,31 @@ describe("Lab 3 -> Lab 4 migration and seed", () => {
     expect(actions.some((a) => a.ticket.ownerId !== null)).toBe(true);
     expect(actions.some((a) => a.followUpRequired && a.followUpNote)).toBe(true);
     expect(actions.some((a) => !a.followUpRequired)).toBe(true);
+  }, 60000);
+
+  // API-39 — BR-23: dashboards are computed live from the seeded dataset and
+  // must stay responsive (a coarse smoke threshold, not a benchmark).
+  it("both dashboard endpoints answer under 500 ms across 20 sequential calls on the seeded data", async () => {
+    execSync("npx tsx prisma/seed.ts", { cwd: serverRoot, stdio: "pipe", env: process.env });
+    const requester = await getPrisma().user.findFirstOrThrow({ where: { role: "REQUESTER", isActive: true } });
+    const staff = await getPrisma().user.findFirstOrThrow({ where: { role: "IT_STAFF", isActive: true } });
+    // Seeded accounts must change their password first; that gate is not under test here.
+    await getPrisma().user.updateMany({ data: { mustChangePassword: false } });
+    const requesterCookie = await sessionCookieFor(requester.id);
+    const staffCookie = await sessionCookieFor(staff.id);
+
+    for (const [url, cookie] of [
+      ["/api/dashboard/requester", requesterCookie],
+      ["/api/dashboard/staff", staffCookie],
+    ] as const) {
+      await request(app).get(url).set("Cookie", cookie); // warm the connection
+      for (let i = 0; i < 20; i++) {
+        const started = performance.now();
+        const res = await request(app).get(url).set("Cookie", cookie);
+        const elapsed = performance.now() - started;
+        expect(res.status, url).toBe(200);
+        expect(elapsed, `${url} call ${i + 1}`).toBeLessThan(500);
+      }
+    }
   }, 60000);
 });

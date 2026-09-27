@@ -132,8 +132,8 @@ a test at its edge value (max passes, max+1 fails).
 |---|---|---|---|---|---|---|
 | API-36 | Migration | specification.md §7 | Apply Lab 4 migration on a copy of the Lab 3 DB | row counts of every pre-existing table unchanged; legacy Tickets have empty Actions Taken list | `server/tests/lab-04/migration-regression.api.test.ts` | Pass |
 | API-37 | Migration | §5.3 of handout | Run seed twice | identical row counts; ≥1 Ticket with 0, 1, and 2+ actions; one Ticket whose owner ≠ action performer | `server/tests/lab-04/migration-regression.api.test.ts` | Pass |
-| API-38 | Regression | AC-16 | Lab 1-3 server suites | pass unmodified | `server/tests/lab-0{1,2,3}/*` | |
-| API-39 | Performance-smoke | BR-23 | Both dashboard endpoints on seeded DB, 20 sequential calls | each responds under 500 ms | `server/tests/lab-04/migration-regression.api.test.ts` | |
+| API-38 | Regression | AC-16 | Lab 1-3 server suites | pass unmodified | `server/tests/lab-0{1,2,3}/*` | Pass |
+| API-39 | Performance-smoke | BR-23 | Both dashboard endpoints on seeded DB, 20 sequential calls | each responds under 500 ms | `server/tests/lab-04/migration-regression.api.test.ts` | Pass |
 
 ### 2.3 UI Component
 
@@ -174,22 +174,32 @@ a test at its edge value (max passes, max+1 fails).
 
 | Test ID | Type | Requirement/AC | What It Tests | Expected Result | Automated Test File | Final |
 |---|---|---|---|---|---|---|
-| RESP-01 | Responsive | ui-spec.md §5.1 | Staff dashboard at 1280/800/375 px | row of cards → 2 per row → single column; no horizontal scroll; screenshots to `artifacts/lab-04/screenshots/staff-dashboard/` | `e2e/lab-04/responsive-visual.spec.ts` | |
-| RESP-02 | Responsive | ui-spec.md §4.2 | Requester dashboard, same three widths | same rules; screenshots to `requester-dashboard/` | `e2e/lab-04/responsive-visual.spec.ts` | |
-| RESP-03 | Responsive | ui-spec.md §4.3 | Actions Taken tab (list, create, edit, empty) at three widths | no clipping/overlap; screenshots to `actions-taken/` | `e2e/lab-04/responsive-visual.spec.ts` | |
-| RESP-04 | Responsive | ui-spec.md §3 | Conflict banner state at three widths | visible, not overlapping controls; screenshots to `ticket-workflow/` | `e2e/lab-04/responsive-visual.spec.ts` | |
+| RESP-01 | Responsive | ui-spec.md §5.1 | Staff dashboard at 1280/800/375 px | row of cards → 2 per row → single column; no horizontal scroll; screenshots to `artifacts/lab-04/screenshots/staff-dashboard/` | `e2e/lab-04/responsive-visual.spec.ts` | Pass |
+| RESP-02 | Responsive | ui-spec.md §4.2 | Requester dashboard, same three widths | same rules; screenshots to `requester-dashboard/` | `e2e/lab-04/responsive-visual.spec.ts` | Pass |
+| RESP-03 | Responsive | ui-spec.md §4.3 | Actions Taken tab (list, create, edit, empty) at three widths | no clipping/overlap; screenshots to `actions-taken/` | `e2e/lab-04/responsive-visual.spec.ts` | Pass |
+| RESP-04 | Responsive | ui-spec.md §3 | Conflict banner state at three widths | visible, not overlapping controls; screenshots to `ticket-workflow/` | `e2e/lab-04/responsive-visual.spec.ts` | Pass |
+
+### 2.5a Accessibility
+
+Added in the hardening phase (issue #66) for the checklist in §4. Each drives a real browser and reads computed styles.
+
+| Test ID | Type | Requirement/AC | What It Tests | Expected Result | Automated Test File | Final |
+|---|---|---|---|---|---|---|
+| A11Y-01 | Accessibility | ui-spec.md §5.1, §5.2 | Keyboard focus on a metric-card link, a status chip and a list row | solid outline of at least 2px on each | `e2e/lab-04/accessibility.spec.ts` | Pass |
+| A11Y-02 | Accessibility | ui-spec.md §2, §5.1 | Status badges carry text; metric values are numbers | no colour-only status; `0` still rendered | `e2e/lab-04/accessibility.spec.ts` | Pass |
+| A11Y-03 | Accessibility | ui-spec.md §3, §4.3 | Keyboard focus on the Edit action and the conflict Refresh action | solid outline of at least 2px on each | `e2e/lab-04/accessibility.spec.ts` | Pass |
 
 ### 2.6 End-to-End
 
 | Test ID | Type | Requirement/AC | What It Tests | Expected Result | Automated Test File | Final |
 |---|---|---|---|---|---|---|
-| E2E-01 | E2E | AC-01, AC-04, AC-15 | Staff A logs in, adds an Action Taken; Staff B edits it | appears in list; performer stays A after B's edit | `e2e/lab-04/actions-taken-flow.spec.ts` | |
-| E2E-02 | E2E | AC-03, AC-06 | Invalid follow-up shows field message; Requester then sees all actions read-only | message shown; no edit controls for Requester | `e2e/lab-04/actions-taken-flow.spec.ts` | |
-| E2E-03 | E2E | AC-09, AC-10, BR-18 | Requester marks "appears resolved" (status unchanged); staff moves Ticket to Resolved | status changes only after staff action | `e2e/lab-04/ticket-resolution.spec.ts` | |
-| E2E-04 | E2E | AC-08, AC-17 | Two staff sessions on one Ticket; second submits stale status change | conflict banner; Refresh then retry succeeds | `e2e/lab-04/ticket-resolution.spec.ts` | |
-| E2E-05 | E2E | AC-11, BR-25 | Staff dashboard count card click | Queue opens pre-filtered with matching count | `e2e/lab-04/dashboards.spec.ts` | |
-| E2E-06 | E2E | AC-02, AC-13 | Requester dashboard values match DB; Requester with zero Tickets shows zeros | metrics equal DB query; empty states | `e2e/lab-04/dashboards.spec.ts` | |
-| E2E-07 | E2E | AC-16, FR-12 | Representative regression: login, My Tickets, Ticket Detail, attachment, public comment, internal note, admin user management | all still work | `e2e/lab-04/dashboards.spec.ts` | |
+| E2E-01 | E2E | AC-01, AC-04, AC-15 | Staff A logs in, adds an Action Taken; Staff B edits it | appears in list; performer stays A after B's edit | `e2e/lab-04/actions-taken-flow.spec.ts` | Pass |
+| E2E-02 | E2E | AC-03, AC-06 | Invalid follow-up shows field message; Requester then sees all actions read-only | message shown; no edit controls for Requester | `e2e/lab-04/actions-taken-flow.spec.ts` | Pass |
+| E2E-03 | E2E | AC-09, AC-10, BR-18 | Requester marks "appears resolved" (status unchanged); staff moves Ticket to Resolved | status changes only after staff action | `e2e/lab-04/ticket-resolution.spec.ts` | Pass |
+| E2E-04 | E2E | AC-08, AC-17 | Two staff sessions on one Ticket; second submits stale status change | conflict banner; Refresh then retry succeeds | `e2e/lab-04/ticket-resolution.spec.ts` | Pass |
+| E2E-05 | E2E | AC-11, BR-25 | Staff dashboard count card click | Queue opens pre-filtered with matching count | `e2e/lab-04/dashboards.spec.ts` | Pass |
+| E2E-06 | E2E | AC-02, AC-13 | Requester dashboard values match DB; Requester with zero Tickets shows zeros | metrics equal DB query; empty states | `e2e/lab-04/dashboards.spec.ts` | Pass |
+| E2E-07 | E2E | AC-16, FR-12 | Representative regression: login, My Tickets, Ticket Detail, attachment, public comment, internal note, admin user management | all still work | `e2e/lab-04/dashboards.spec.ts` | Pass |
 
 ---
 
@@ -226,15 +236,15 @@ beyond ACs: BR-05/06/07 (UNIT-01..03, API-03/04), BR-10 (API-09), BR-14
 Completed per screen at desktop/tablet/mobile before the PDF is assembled
 (Part 9). Each item is checked against `ui-spec.md`, not memory.
 
-- [ ] Zen Green tokens used; no new colour introduced (Follow-up chip uses the existing Warning token only)
-- [ ] Editable vs. read-only fields visually distinct (Actions Taken create/edit vs. Requester read view)
-- [ ] Validation messages adjacent to their field
-- [ ] Visible keyboard focus on cards, list rows, Edit action, Refresh action
-- [ ] Non-colour status cues (badge text/icon, "Follow-up needed" label)
-- [ ] No clipped labels, overlapping controls, or horizontal page scroll
-- [ ] Metric cards show `0`, never disappear
-- [ ] Loading, empty, forbidden, conflict, safe-failure states each captured
-- [ ] Screenshot folders: `staff-dashboard/`, `requester-dashboard/`, `actions-taken/`, `ticket-workflow/`
+- [x] Zen Green tokens used; no new colour introduced; dashboard classes reuse the existing tokens (one shadow tint derived from the text colour) (Follow-up chip uses the existing Warning token only)
+- [x] Editable vs. read-only fields visually distinct; see `actions-taken/list-*` and `requester-read-only-*` (Actions Taken create/edit vs. Requester read view)
+- [x] Validation messages adjacent to their field; see `actions-taken/create-validation-*`, STYLE-04
+- [x] Visible keyboard focus on cards, list rows, Edit action, Refresh action; A11Y-01, A11Y-03
+- [x] Non-colour status cues (badge text/icon, "Follow-up needed" label); A11Y-02, STYLE-03
+- [x] No clipped labels, overlapping controls, or horizontal page scroll; asserted at 1280/820/390 px for every captured state (RESP-01..04)
+- [x] Metric cards show `0`, never disappear; UI-11, E2E-06, A11Y-02
+- [x] Loading, empty, forbidden, conflict, safe-failure states each captured; every state reachable on each screen is captured
+- [x] Screenshot folders: `staff-dashboard/`, `requester-dashboard/`, `actions-taken/`, `ticket-workflow/`; 48 PNGs under `artifacts/lab-04/screenshots/`
 
 ## 5. Test Commands
 
@@ -249,6 +259,16 @@ cd e2e && npx playwright test                  # responsive + E2E (dev servers, 
 
 To be filled from a run on `main` after the release PR merges: per-suite
 pass counts, total, and the run date. Left blank until then.
+
+### Pre-release run on `feature/lab4-hardening`
+
+Not the official final run (that is taken on `main` after the release PR, above):
+server 26 files / 275 tests, client 22 files / 112 tests, Playwright 59 tests
+(Labs 2, 3 and 4 together), all passing, 2026-09-26.
+
+Hardening fix found by the responsive checks: on a phone-width Requester
+Ticket Detail, an attachment row's Preview/Download/Remove buttons pushed the
+page into horizontal scroll (Lab 2 layout); the row now wraps.
 
 ## 7. Known Limitations or Deferred Tests
 
