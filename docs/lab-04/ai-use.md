@@ -1,12 +1,14 @@
 # Lab 4 — AI Use
 
-**LLM / agent used:** Claude (Anthropic), via Claude Code (terminal agent)
-for file edits, running tests, browser-driven UI checks, and git/GitHub
-operations. Lab 4 ran as two long-lived Claude Code windows in
-`D:\SoftwareEng` — one that carried the sprint from the engineering
-contract (#61) through Ticket workflow (#64), and a second that picked up
-from Actions Taken UI (#63) through the release prep (#66/#67). Prompts
-below are drawn from both windows, verified against their transcripts, not
+**LLM / agent used:** Claude Sonnet 5 (Anthropic model `claude-sonnet-5`),
+via Claude Code (terminal agent) for file edits, running tests,
+browser-driven UI checks, and git/GitHub operations — confirmed by the
+`Co-Authored-By: Claude Sonnet 5` trailer on every Lab 4 commit. Lab 4 ran
+as two long-lived Claude Code windows in `D:\SoftwareEng`, both on the
+same model — one that carried the sprint from the engineering contract
+(#61) through Ticket workflow (#64), and a second that picked up from
+Actions Taken UI (#63) through the release prep (#66/#67). Prompts below
+are drawn from both windows, verified against their transcripts, not
 reconstructed from memory.
 
 ---
@@ -173,7 +175,9 @@ PR after this one linked cleanly and automatically.
 found that inline review comments had been answered, but the reviewer's
 separate approval notes had been left unanswered. Replied to all three
 approval notes immediately, named the still-open item from the #70 note
-(a `§11.16-17` citation that only #70 fixed), and stated the rule going
+(a `§11.16-17` citation that named a section #70 didn't actually change,
+since only §11.17 covers the status filter — fixed later on the #63
+branch, since #70 was already merged by then), and stated the rule going
 forward: an approval note is still a review comment, and silence under it
 doesn't count as a reply.
 
@@ -182,3 +186,37 @@ Easy thing to miss because an "Approved" verdict feels like the
 conversation is over, but the course guide grades on replying to every
 comment, approval notes included. Asking caught a real gap before it
 became a pattern.
+
+---
+
+## My Reflection: Specification Agent and Coding Agent Use
+
+**Specification agent.** For #61 (the Sprint 4 engineering contract), the
+agent didn't just transcribe the handout — it resolved real ambiguities
+into numbered BR/FR/AC statements before any code existed (e.g. which
+writes bump `Ticket.updatedAt` for the concurrency check, and that the
+resolution gate reuses `updatedAt` rather than a new version column). That
+spec then held up: every later PR's review comments were about the spec
+being incomplete or miscited (BR-27's citation, the "unmodified tests"
+wording), not about the implementation contradicting a spec that was
+right from the start. The cost was that keeping `specification.md` and
+`api-spec.md` in sync every time a review comment changed behavior (e.g.
+the Requester status-filter exception, the `isActive` dashboard filter)
+was its own recurring task — the agent did this well, but it required
+being told explicitly each time rather than happening automatically.
+
+**Coding agent.** The TDD discipline held across the whole sprint —
+failing tests written first, then the implementation, checked against
+both the new Lab 4 suite and the full Lab 1-3 regression suite before any
+PR opened. The most valuable moments weren't the routine implementation,
+but where the agent caught real defects beyond what was asked: the Lab 2
+`Prisma update({ data: {} })` no-op bug that silently broke the
+concurrency check's precondition, the dashboard page-padding regression
+found from its own screenshots, and the idempotent-replay data-loss bug
+on Actions Taken (Prompt 1 above, discovered during review, not by me).
+Where it needed correction was pacing and process, not code correctness —
+jumping ahead of a merge confirmation (Prompt 3), skipping an issue in
+the planned order without flagging it (Prompt 5), and missing PR-issue
+links until the workflow gate existed (Prompts 6-7). Those corrections
+went into `CLAUDE.md` as durable rules rather than one-off fixes, so each
+mistake type happened at most once across the six feature PRs.
