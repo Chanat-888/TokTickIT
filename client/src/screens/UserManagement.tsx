@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   createUser,
   getAdminUsers,
@@ -33,13 +34,24 @@ function StatusPill({ isActive }: { isActive: boolean }) {
 
 export default function UserManagement() {
   const { user: currentUser } = useAuth();
+  // BR-25 — the Accounts card on the Administrator Dashboard links here as ?role=<role>.
+  const [searchParams] = useSearchParams();
 
   const [users, setUsers] = useState<User[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
 
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState<Role | "">("");
+  const [roleFilter, setRoleFilter] = useState<Role | "">(() => {
+    const role = searchParams.get("role");
+    return role !== null && role in ROLE_LABEL ? (role as Role) : "";
+  });
+
+  // "" = all, otherwise the isActive query value. Set from ?isActive= by the Accounts card (BR-25).
+  const [activeFilter, setActiveFilter] = useState<"" | "true" | "false">(() => {
+    const v = searchParams.get("isActive");
+    return v === "true" || v === "false" ? v : "";
+  });
 
   const [panelMode, setPanelMode] = useState<PanelMode>("none");
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -75,7 +87,11 @@ export default function UserManagement() {
   const load = useCallback(() => {
     const requestId = ++latestRequestId.current;
     setLoadState("loading");
-    getAdminUsers({ search: debouncedSearch || undefined, role: roleFilter || undefined })
+    getAdminUsers({
+      search: debouncedSearch || undefined,
+      role: roleFilter || undefined,
+      isActive: activeFilter === "" ? undefined : activeFilter === "true",
+    })
       .then((data) => {
         if (latestRequestId.current !== requestId) return;
         setUsers(data);
@@ -86,7 +102,7 @@ export default function UserManagement() {
         const status = err instanceof Error ? Number(err.message.match(/status (\d+)/)?.[1]) : undefined;
         setLoadState(status === 403 ? "forbidden" : "error");
       });
-  }, [debouncedSearch, roleFilter]);
+  }, [debouncedSearch, roleFilter, activeFilter]);
 
   useEffect(() => {
     load();
@@ -214,7 +230,7 @@ export default function UserManagement() {
   const isSoleActiveAdmin = editingUser?.role === "ADMINISTRATOR" && editingUser?.isActive && otherActiveAdmins === 0;
   const activeToggleDisabled = Boolean(editingUser?.isActive && (isSelf || isSoleActiveAdmin));
 
-  const hasCommittedFilter = Boolean(debouncedSearch || roleFilter);
+  const hasCommittedFilter = Boolean(debouncedSearch || roleFilter || activeFilter);
   const isEmptyState = loadState === "loaded" && users.length === 0 && !hasCommittedFilter;
   const isNoResultsState = loadState === "loaded" && users.length === 0 && hasCommittedFilter;
 
@@ -259,6 +275,16 @@ export default function UserManagement() {
             <option value="REQUESTER">Requester</option>
             <option value="IT_STAFF">IT Staff</option>
             <option value="ADMINISTRATOR">Administrator</option>
+          </select>
+          <select
+            className="ticket-toolbar__filter"
+            aria-label="Account Status"
+            value={activeFilter}
+            onChange={(e) => setActiveFilter(e.target.value as "" | "true" | "false")}
+          >
+            <option value="">All Accounts</option>
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
           </select>
           <button type="button" className="btn btn--primary" onClick={openCreate}>
             Create User

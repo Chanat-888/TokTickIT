@@ -77,7 +77,9 @@ export async function selectRequester(page: Page, name: string): Promise<void> {
     await page.locator('button[type="submit"]').click();
   }
 
-  await page.waitForURL("**/tickets");
+  // Lab 4 — every role now lands on its Dashboard; the Lab 2 flows start from My Tickets.
+  await page.waitForURL("**/dashboard");
+  await page.goto("/tickets");
 }
 
 // Logs out (session cookie cleared) and lands back on /login — the

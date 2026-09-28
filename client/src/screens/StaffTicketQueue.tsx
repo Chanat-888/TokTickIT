@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   getAssignableUsers,
   getCategories,
@@ -61,15 +61,22 @@ function SortIcon({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
 export default function StaffTicketQueue() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  // BR-25 — a dashboard drill-down link arrives as ?status=A,B,C and/or
+  // ?ownerId=unassigned|<callerId>.
+  const [searchParams] = useSearchParams();
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
 
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<TicketStatus | "">("");
+  const [statusFilter, setStatusFilter] = useState(() => searchParams.get("status") ?? "");
   const [itPriorityFilter, setItPriorityFilter] = useState("");
-  const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>("");
+  const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>(() => {
+    const owner = searchParams.get("ownerId");
+    if (owner === "unassigned") return "unassigned";
+    return owner !== null && Number(owner) === user?.id ? "mine" : "";
+  });
 
   const [sortBy, setSortBy] = useState<SortableTicketField>("createdAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -175,7 +182,7 @@ export default function StaffTicketQueue() {
     setPage(1);
   }
 
-  function handleStatusFilterChange(value: TicketStatus | "") {
+  function handleStatusFilterChange(value: string) {
     setStatusFilter(value);
     setPage(1);
   }
@@ -247,7 +254,7 @@ export default function StaffTicketQueue() {
             className="ticket-toolbar__filter"
             aria-label="Status"
             value={statusFilter}
-            onChange={(e) => handleStatusFilterChange(e.target.value as TicketStatus | "")}
+            onChange={(e) => handleStatusFilterChange(e.target.value)}
           >
             <option value="">All Statuses</option>
             {STATUS_OPTIONS.map((o) => (
@@ -255,6 +262,7 @@ export default function StaffTicketQueue() {
                 {o.label}
               </option>
             ))}
+            {statusFilter.includes(",") && <option value={statusFilter}>Selected statuses</option>}
           </select>
 
           <select

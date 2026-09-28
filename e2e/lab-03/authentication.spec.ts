@@ -27,8 +27,8 @@ test("E2E-01 login with a must-change-password seeded user forces Change Passwor
   await page.locator("#change-password-confirm").fill("ChangedPassword1");
   await page.locator('button[type="submit"]').click();
 
-  await page.waitForURL("**/staff/tickets");
-  await expect(page.locator(".staff-ticket-queue")).toBeVisible();
+  await page.waitForURL("**/dashboard");
+  await expect(page.locator(".dashboard")).toBeVisible();
 });
 
 // E2E-02 — AC-05, AC-06: invalid login, then a correct-credentials
@@ -70,6 +70,8 @@ test("E2E-04 a migrated Requester's pre-existing Tickets are visible in My Ticke
   page,
 }) => {
   await login(page, SEEDED_USERS.requester.email);
+  // Lab 4: login lands on the Dashboard; My Tickets is one navigation away.
+  await page.goto("/tickets");
 
   await expect(page.locator(".my-tickets")).toBeVisible();
   // At least the seeded 25 — other specs in this same shared, single-worker

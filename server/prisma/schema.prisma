@@ -44,6 +44,7 @@ model User {
   sessions           Session[]
   publicComments     PublicComment[]
   internalNotes      InternalNote[]
+  actionsTaken       ActionTaken[]
 }
 
 model Session {
@@ -89,6 +90,7 @@ model Ticket {
   attachments                  Attachment[]
   publicComments               PublicComment[]
   internalNotes                InternalNote[]
+  actionsTaken                 ActionTaken[]
 
   @@unique([requesterId, idempotencyKey])
   @@index([requesterId])
@@ -134,6 +136,29 @@ model InternalNote {
   author    User     @relation(fields: [authorId], references: [id])
 
   @@index([ticketId])
+}
+
+// Lab 4 — Actions Taken by IT Staff (docs/lab-04/specification.md §7).
+// createdAt is the server-clock "Action date/time" (BR-04); performedById is
+// the session user and immutable (BR-03/BR-09). Result is free text (§11.2).
+model ActionTaken {
+  id               Int      @id @default(autoincrement())
+  ticketId         Int
+  performedById    Int
+  description      String
+  result           String
+  followUpRequired Boolean  @default(false)
+  followUpNote     String?
+  attachmentNotes  String?
+  idempotencyKey   String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  ticket           Ticket   @relation(fields: [ticketId], references: [id])
+  performedBy      User     @relation(fields: [performedById], references: [id])
+
+  @@unique([ticketId, idempotencyKey])
+  @@index([ticketId])
+  @@index([performedById])
 }
 
 enum Priority {

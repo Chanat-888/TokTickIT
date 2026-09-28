@@ -214,7 +214,8 @@ export interface TicketListParams {
   search?: string;
   categoryId?: number;
   requestedPriority?: Priority;
-  status?: "NEW";
+  // docs/lab-04/api-spec.md §0.4 — one status, or a comma-separated list.
+  status?: string;
   sortBy?: string;
   sortDir?: "asc" | "desc";
   page?: number;
@@ -328,7 +329,8 @@ export interface StaffTicketListResult {
 
 export interface StaffTicketListParams {
   search?: string;
-  status?: TicketStatus;
+  // docs/lab-04/api-spec.md §0.4 — one status, or a comma-separated list.
+  status?: string;
   itPriority?: Priority;
   ownerId?: number | "unassigned";
   sortBy?: string;
@@ -396,35 +398,12 @@ export async function getStaffTicket(id: number): Promise<StaffTicketDetail> {
   return (await res.json()) as StaffTicketDetail;
 }
 
-// BR-18: null unassigns; any other value claims/(re)assigns.
-export async function setTicketOwner(ticketId: number, ownerId: number | null): Promise<StaffTicket> {
-  const res = await apiFetch(`/api/staff/tickets/${ticketId}/owner`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ownerId }),
-  });
-  if (res.status === 404) {
-    throw new NotFoundError("Not found");
+// docs/lab-04 BR-17: thrown on a stale-write 409 so the UI can offer a
+// refresh; `current` is the fresh Ticket the server returned with it.
+export class StaleTicketError extends Error {
+  constructor(public readonly current: StaffTicket) {
+    super("This ticket was changed by someone else.");
   }
-  if (!res.ok) {
-    throw new Error(`Set owner failed with status ${res.status}`);
-  }
-  return (await res.json()) as StaffTicket;
-}
-
-export async function setTicketItPriority(ticketId: number, itPriority: Priority): Promise<StaffTicket> {
-  const res = await apiFetch(`/api/staff/tickets/${ticketId}/it-priority`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ itPriority }),
-  });
-  if (res.status === 404) {
-    throw new NotFoundError("Not found");
-  }
-  if (!res.ok) {
-    throw new Error(`Set IT priority failed with status ${res.status}`);
-  }
-  return (await res.json()) as StaffTicket;
 }
 
 // BR-19: thrown on 409 so the UI can surface the specific message — the
@@ -432,18 +411,71 @@ export async function setTicketItPriority(ticketId: number, itPriority: Priority
 // fallback (e.g. a stale screen) rather than the normal path.
 export class StatusTransitionError extends Error {}
 
-export async function setTicketStatus(ticketId: number, status: TicketStatus): Promise<StaffTicket> {
-  const res = await apiFetch(`/api/staff/tickets/${ticketId}/status`, {
-    method: "PATCH",
+// A 409 from the three Ticket writes is either a stale write (carries
+// `current`) or, for status only, an illegal transition.
+async function throwOnTicketConflict(res: Response): Promise<void> {
+  if (res.status !== 409) return;
+  const body = (await res.json().catch(() => ({}))) as { current?: StaffTicket };
+  if (body.current) throw new StaleTicketError(body.current);
+  throw new StatusTransitionError("Status transition not permitted");
+}
+
+// BR-18: null unassigns; any other value claims/(re)assigns. Every write
+// sends the Ticket's last-known updatedAt (BR-17).
+export async function setTicketOwner(
+  ticketId: number,
+  ownerId: number | null,
+  expectedUpdatedAt: string,
+): Promise<StaffTicket> {
+  const res = await apiFetch(`/api/staff/tickets/${ticketId}/owner`, {
+    method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ ownerId, expectedUpdatedAt }),
   });
   if (res.status === 404) {
     throw new NotFoundError("Not found");
   }
-  if (res.status === 409) {
-    throw new StatusTransitionError("Status transition not permitted");
+  await throwOnTicketConflict(res);
+  if (!res.ok) {
+    throw new Error(`Set owner failed with status ${res.status}`);
   }
+  return (await res.json()) as StaffTicket;
+}
+
+export async function setTicketItPriority(
+  ticketId: number,
+  itPriority: Priority,
+  expectedUpdatedAt: string,
+): Promise<StaffTicket> {
+  const res = await apiFetch(`/api/staff/tickets/${ticketId}/it-priority`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ itPriority, expectedUpdatedAt }),
+  });
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  await throwOnTicketConflict(res);
+  if (!res.ok) {
+    throw new Error(`Set IT priority failed with status ${res.status}`);
+  }
+  return (await res.json()) as StaffTicket;
+}
+
+export async function setTicketStatus(
+  ticketId: number,
+  status: TicketStatus,
+  expectedUpdatedAt: string,
+): Promise<StaffTicket> {
+  const res = await apiFetch(`/api/staff/tickets/${ticketId}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status, expectedUpdatedAt }),
+  });
+  if (res.status === 404) {
+    throw new NotFoundError("Not found");
+  }
+  await throwOnTicketConflict(res);
   if (!res.ok) {
     throw new Error(`Set status failed with status ${res.status}`);
   }
@@ -559,12 +591,14 @@ export async function postNote(ticketId: number, body: string): Promise<Comment>
 export interface AdminUserListParams {
   search?: string;
   role?: Role;
+  isActive?: boolean;
 }
 
 export async function getAdminUsers(params: AdminUserListParams): Promise<User[]> {
   const query = new URLSearchParams();
   if (params.search !== undefined) query.set("search", params.search);
   if (params.role !== undefined) query.set("role", params.role);
+  if (params.isActive !== undefined) query.set("isActive", String(params.isActive));
 
   const qs = query.toString();
   const res = await apiFetch(`/api/admin/users${qs ? `?${qs}` : ""}`);
@@ -662,4 +696,156 @@ export async function setUserPassword(id: number, newPassword: string): Promise<
     throw new NotFoundError("Not found");
   }
   throw new Error(`Set user password failed with status ${res.status}`);
+}
+
+// ---------------------------------------------------------------------------
+// Lab 4 — Actions Taken (docs/lab-04/api-spec.md §1)
+// ---------------------------------------------------------------------------
+
+export interface ActionTaken {
+  id: number;
+  ticketId: number;
+  performedById: number;
+  performedByName: string;
+  description: string;
+  result: string;
+  followUpRequired: boolean;
+  followUpNote: string | null;
+  attachmentNotes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// The five editable fields as the form holds them (text fields are strings,
+// never null); Performed By and the timestamp are set by the server (BR-03/04).
+export interface ActionTakenFields {
+  description: string;
+  result: string;
+  followUpRequired: boolean;
+  followUpNote: string;
+  attachmentNotes: string;
+}
+
+export interface FieldMessage {
+  field: string;
+  message: string;
+}
+
+// Thrown on a 400 so the form can place each message beside its field.
+export class FieldValidationError extends Error {
+  constructor(public readonly errors: FieldMessage[]) {
+    super("Validation failed");
+  }
+}
+
+function actionPayload(fields: ActionTakenFields) {
+  return {
+    description: fields.description,
+    result: fields.result,
+    followUpRequired: fields.followUpRequired,
+    ...(fields.followUpRequired ? { followUpNote: fields.followUpNote } : {}),
+    attachmentNotes: fields.attachmentNotes,
+  };
+}
+
+async function throwOnActionError(res: Response, what: string): Promise<void> {
+  if (res.status === 404) throw new NotFoundError("Not found");
+  if (res.status === 400) {
+    const body = (await res.json().catch(() => ({}))) as { errors?: FieldMessage[] };
+    throw new FieldValidationError(body.errors ?? []);
+  }
+  if (!res.ok) throw new Error(`${what} failed with status ${res.status}`);
+}
+
+export async function getActionsTaken(ticketId: number): Promise<ActionTaken[]> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/actions-taken`);
+  await throwOnActionError(res, "Actions Taken fetch");
+  const body = (await res.json()) as { data: ActionTaken[] };
+  return body.data;
+}
+
+// `alreadySaved` is true when the server answered 200: an earlier request with
+// the same idempotencyKey had already saved, so it returned that original row
+// and ignored this request's text (BR-13).
+export async function createActionTaken(
+  ticketId: number,
+  fields: ActionTakenFields,
+  idempotencyKey: string,
+): Promise<{ action: ActionTaken; alreadySaved: boolean }> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/actions-taken`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...actionPayload(fields), idempotencyKey }),
+  });
+  await throwOnActionError(res, "Create Action Taken");
+  return { action: (await res.json()) as ActionTaken, alreadySaved: res.status === 200 };
+}
+
+export async function updateActionTaken(
+  ticketId: number,
+  actionId: number,
+  fields: ActionTakenFields,
+): Promise<ActionTaken> {
+  const res = await apiFetch(`/api/tickets/${ticketId}/actions-taken/${actionId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(actionPayload(fields)),
+  });
+  await throwOnActionError(res, "Update Action Taken");
+  return (await res.json()) as ActionTaken;
+}
+
+// ---------------------------------------------------------------------------
+// Lab 4 — Dashboards (docs/lab-04/api-spec.md §3).
+// ---------------------------------------------------------------------------
+
+export interface TicketSummary {
+  id: number;
+  ticketNumber: string;
+  summary: string;
+  status: TicketStatus;
+  updatedAt: string;
+}
+
+export interface RequesterDashboard {
+  myOpenTickets: number;
+  waitingForRequester: number;
+  recentlyUpdated: TicketSummary[];
+  recentlyResolved: TicketSummary[];
+}
+
+export interface ActionTakenSummary {
+  id: number;
+  ticketId: number;
+  ticketNumber: string;
+  description: string;
+  createdAt: string;
+}
+
+export interface StaffDashboard {
+  unassigned: number;
+  myAssigned: number;
+  byStatus: Record<TicketStatus, number>;
+  recentlyUpdated: TicketSummary[];
+  myRecentActionsTaken: ActionTakenSummary[];
+  // Present only for an Administrator caller (BR-22).
+  accounts: Record<Role, number> | null;
+}
+
+// A non-2xx status is thrown with its code in the message, like the list
+// fetchers, so a screen can tell forbidden (403) from a failure.
+export async function getRequesterDashboard(): Promise<RequesterDashboard> {
+  const res = await apiFetch("/api/dashboard/requester");
+  if (!res.ok) {
+    throw new Error(`Requester dashboard fetch failed with status ${res.status}`);
+  }
+  return (await res.json()) as RequesterDashboard;
+}
+
+export async function getStaffDashboard(): Promise<StaffDashboard> {
+  const res = await apiFetch("/api/dashboard/staff");
+  if (!res.ok) {
+    throw new Error(`Staff dashboard fetch failed with status ${res.status}`);
+  }
+  return (await res.json()) as StaffDashboard;
 }

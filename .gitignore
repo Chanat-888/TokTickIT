@@ -23,3 +23,6 @@ e2e/playwright-report/
 *.log
 .DS_Store
 docs/lab-02/*.pdf
+
+# Course-issued workflow guide: kept locally for Claude sessions, not published (public repo)
+docs/GitHub_Workflow_Guide.pdf

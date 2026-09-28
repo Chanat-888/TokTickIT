@@ -31,6 +31,8 @@ import { getAttachmentError } from "../lib/attachmentValidation.js";
 import AttachmentPicker from "../components/AttachmentPicker.js";
 import Badge from "../components/Badge.js";
 import StateBanner from "../components/StateBanner.js";
+import ActionsTakenPanel from "../components/ActionsTakenPanel.js";
+import { useActionsTaken } from "../lib/useActionsTaken.js";
 
 type LoadState = "loading" | "loaded" | "not-found" | "error";
 
@@ -183,7 +185,7 @@ function AttachmentRow({
     <li
       className={`attachment-item ${attachment.isRemoved ? "attachment-item--removed" : "attachment-item--active"}${disabled ? " attachment-item--unavailable" : ""}`}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-md)" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "var(--space-md)" }}>
         <span className="attachment-item__name">{attachment.originalFilename}</span>
         <span className="attachment-item__meta">
           {formatSize(attachment.sizeBytes)} · Uploaded {formatDate(attachment.createdAt)}
@@ -197,7 +199,7 @@ function AttachmentRow({
         </span>
 
         {!attachment.isRemoved && (
-          <span style={{ display: "flex", gap: "var(--space-sm)" }}>
+          <span style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-sm)" }}>
             <a
               className="btn btn--tertiary attachment-item__preview-btn"
               href={href}
@@ -329,6 +331,7 @@ function PublicCommentsPanel({
 export default function TicketDetail() {
   const { id } = useParams<{ id: string }>();
 
+  const actionsTaken = useActionsTaken(Number(id));
   const [categories, setCategories] = useState<Category[]>([]);
   const [relatedSystems, setRelatedSystems] = useState<RelatedSystem[]>([]);
 
@@ -715,6 +718,18 @@ export default function TicketDetail() {
               {resolveError && <p className="field__message field__message--error">{resolveError}</p>}
             </section>
           )}
+
+          <section className="ticket-detail__actions">
+            <h2>Actions Taken</h2>
+            <ActionsTakenPanel
+              items={actionsTaken.items}
+              state={actionsTaken.state}
+              canEdit={false}
+              onRetry={actionsTaken.reload}
+              onCreate={actionsTaken.create}
+              onUpdate={actionsTaken.update}
+            />
+          </section>
 
           <PublicCommentsPanel
             state={commentsState}

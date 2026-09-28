@@ -9,6 +9,8 @@ import TicketDetail from "./screens/TicketDetail.js";
 import StaffTicketQueue from "./screens/StaffTicketQueue.js";
 import StaffTicketDetail from "./screens/StaffTicketDetail.js";
 import UserManagement from "./screens/UserManagement.js";
+import RequesterDashboard from "./screens/RequesterDashboard.js";
+import StaffDashboard from "./screens/StaffDashboard.js";
 import { AuthProvider, useAuth } from "./lib/authContext.js";
 import StateBanner from "./components/StateBanner.js";
 
@@ -75,24 +77,19 @@ function LoginRoute() {
   return <Login />;
 }
 
-// FR-05 — role-specific home. Administrator also has nav access to the
-// Ticket Queue (ui-spec.md §5.3), so both roles land there; User
-// Management (Administrator's own screen) is a later phase, reached via
-// its own future nav link rather than Home.
+// docs/lab-04/ui-spec.md §8 — each role's Dashboard is its post-login
+// landing screen; the queue / My Tickets stay reachable from the nav.
 function Home() {
   const { user } = useAuth();
-  if (user?.role === "REQUESTER") {
-    return <Navigate to="/tickets" replace />;
+  if (user) {
+    return <Navigate to="/dashboard" replace />;
   }
-  if (user?.role === "IT_STAFF" || user?.role === "ADMINISTRATOR") {
-    return <Navigate to="/staff/tickets" replace />;
-  }
-  return (
-    <AppShell>
-      <h1>Welcome, {user?.name}</h1>
-      <p>Your screens are coming in a later phase of this sprint.</p>
-    </AppShell>
-  );
+  return null;
+}
+
+function Dashboard() {
+  const { user } = useAuth();
+  return user?.role === "REQUESTER" ? <RequesterDashboard /> : <StaffDashboard />;
 }
 
 function NotFoundPlaceholder() {
@@ -116,6 +113,16 @@ function AppRoutes() {
         element={
           <RequireAuth>
             <Home />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/dashboard"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <Dashboard />
+            </AppShell>
           </RequireAuth>
         }
       />
