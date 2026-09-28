@@ -257,8 +257,21 @@ cd e2e && npx playwright test                  # responsive + E2E (dev servers, 
 
 ## 6. Final Results
 
-To be filled from a run on `main` after the release PR merges: per-suite
-pass counts, total, and the run date. Left blank until then.
+### Run on `main` after release PR #77 — 2026-09-28
+
+server 26 files / 275 tests, client 22 files / 112 tests, all passing.
+Seed (`npm run prisma:seed`) run twice: identical 10 users / 30 tickets
+both times, idempotent. Playwright came back 58/59:
+`e2e/lab-04/ticket-resolution.spec.ts` E2E-03 failed deterministically
+(3/3 runs, fresh seed each time), traced to a genuine race between the
+Owner/IT-Priority/Status controls sharing one `updatedAt` concurrency
+token in `StaffTicketDetail.tsx` — filed as
+[Issue #78](https://github.com/Chanat-888/TokTickIT/issues/78).
+
+**Fix verified on `feature/lab4-claim-race` ([PR #79](https://github.com/Chanat-888/TokTickIT/pull/79)),
+not yet on `main`:** with the fix, Playwright is 59/59 (server/client
+unaffected at 275/275 and 112/112). This row will be updated once #79
+merges through `lab4-staging` to `main`.
 
 ### Pre-release run on `feature/lab4-hardening`
 
