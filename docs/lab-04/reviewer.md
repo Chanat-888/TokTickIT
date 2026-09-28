@@ -163,6 +163,8 @@ Pull Requests I authored on `Chanat-888/TokTickIT` and Jeerasak reviewed, all ta
 | [#71](https://github.com/Chanat-888/TokTickIT/pull/71) | feature/lab4-actions-ui -> lab4-staging | Changes requested (2 comments), fixed in `7d072ec`, approved, merged by reviewer |
 | [#72](https://github.com/Chanat-888/TokTickIT/pull/72) | feature/lab4-dashboards -> lab4-staging | Changes requested (2 comments), fixed in `c00ba24`, approved, merged by reviewer |
 | [#73](https://github.com/Chanat-888/TokTickIT/pull/73) | feature/lab4-hardening -> lab4-staging | Approved (non-blocking note), merged by reviewer |
+| [#74](https://github.com/Chanat-888/TokTickIT/pull/74) | feature/lab4-reviewer -> lab4-staging | Approved (non-blocking note), fixed in `1803fdb`; follow-up comment asking for this file's two-section layout, fixed in `d983118`/`8dd6d74`; open, awaiting re-review |
+| [#75](https://github.com/Chanat-888/TokTickIT/pull/75) | feature/lab4-ai-use -> lab4-staging | Changes requested (3 comments), fixed in `77907f2`, approved, merged by reviewer |
 
 ### PR #68 — Sprint 4 engineering contract (Issue #61)
 
@@ -279,3 +281,51 @@ Full Labs 1-3 regression pass, responsive/a11y checks, screenshots, README updat
 (Issue #67).
 
 Approved and merged into `lab4-staging` by the reviewer.
+
+### PR #75 — ai-use.md (Issue #67)
+
+Adds `docs/lab-04/ai-use.md`: 8 real prompts drawn from both Lab 4 Claude Code windows, verified against
+their session transcripts.
+
+**Reviewer decision:** Changes requested.
+
+**Comments received and responses**
+
+1. The header named Claude and Claude Code but not the specific model, though the PR's commit trailer said
+   Claude Sonnet 5.
+   **Response:** confirmed both windows used Claude Sonnet 5 (checked the `Co-Authored-By` trailer on every
+   Lab 4 commit) and named it explicitly in the header.
+2. All 8 prompts covered the board/GitHub workflow; none covered the Sprint 4 spec work or the coding/test
+   work, though the handout's Part 4 asks for a reflection on both the specification agent and the coding
+   agent.
+   **Response:** added a closing "My Reflection: Specification Agent and Coding Agent Use" section covering
+   both.
+3. Prompt 8 said the `§11.16-17` citation was one "only #70 fixed", but the actual fix landed on the #63
+   branch after #70 had already merged.
+   **Response:** reworded to say where the fix actually landed.
+
+All three fixed in `77907f2`.
+
+**My approval:** Approved and merged into `lab4-staging` by the reviewer (`e8d27c2`).
+
+### PR #74 — reviewer.md finalization (Issue #67)
+
+Fills gaps in this file itself: a missing PR #71 entry, PR #72's missing closing line, and the PR #73 entry.
+
+**Reviewer decision:** Approved, one non-blocking note.
+
+**Approval note:** the #71 section had no `**Reviewer decision:**` line, unlike #72 and #73.
+**Response:** added in `1803fdb`.
+
+**Follow-up comment (after approval):** asked this file to follow the same two-section layout as
+`docs/lab-03/ai-use.md` — both "Reviews I gave on my partner's PRs" and "Reviews my partner gave on my
+PRs" — since only the latter existed here; also noted the missing `**Reviewer decision:**` line was on
+#68, #69 and #70 too, not only #71.
+**Response:** added the "Reviews I gave on my partner's PRs" section in `d983118`, with a summary table
+and a per-PR write-up for `ShitheadQuin/Toktickit#66`-`#71` (PR link, my actual review findings pulled
+from the GitHub API, Jeerasak's real reply, and my approval), and demoted the existing per-PR headings to
+nest under both sections consistently. Added the missing `**Reviewer decision:**` lines to #68-#70 in
+`8dd6d74`. This entry (and #75's) were added in a further commit once both were settled, per the
+reviewer's request.
+
+Awaiting re-review.
