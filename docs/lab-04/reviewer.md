@@ -168,6 +168,8 @@ Pull Requests I authored on `Chanat-888/TokTickIT` and Jeerasak reviewed, all ta
 
 Docs-only PR: `specification.md`, `ui-spec.md`, `api-spec.md`, `CLAUDE.md`.
 
+**Reviewer decision:** Changes requested.
+
 **Comments received and responses**
 
 1. `specification.md` BR-14 said `Ticket.updatedAt` changes only on the Ticket's own fields, but lab-02 BR-39
@@ -190,6 +192,8 @@ Approved and merged into `lab4-staging` by the reviewer.
 
 Migration, seed, validation, three endpoints, and the first Lab 4 tests.
 
+**Reviewer decision:** Changes requested.
+
 **Comments received and responses**
 
 1. `seed.ts`: spec §7 says seeded actions span assigned and unassigned Tickets, but unassigned Tickets always had
@@ -208,6 +212,8 @@ Approved and squash-merged into `lab4-staging` by the reviewer.
 ### PR #70 — Ticket workflow (Issue #64)
 
 Atomic stale-write protection (BR-17), status list filter (BR-27), the updatedAt fix, and the conflict banner.
+
+**Reviewer decision:** Changes requested.
 
 **Comments received and responses**
 
