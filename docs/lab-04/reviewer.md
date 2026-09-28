@@ -163,8 +163,9 @@ Pull Requests I authored on `Chanat-888/TokTickIT` and Jeerasak reviewed, all ta
 | [#71](https://github.com/Chanat-888/TokTickIT/pull/71) | feature/lab4-actions-ui -> lab4-staging | Changes requested (2 comments), fixed in `7d072ec`, approved, merged by reviewer |
 | [#72](https://github.com/Chanat-888/TokTickIT/pull/72) | feature/lab4-dashboards -> lab4-staging | Changes requested (2 comments), fixed in `c00ba24`, approved, merged by reviewer |
 | [#73](https://github.com/Chanat-888/TokTickIT/pull/73) | feature/lab4-hardening -> lab4-staging | Approved (non-blocking note), merged by reviewer |
-| [#74](https://github.com/Chanat-888/TokTickIT/pull/74) | feature/lab4-reviewer -> lab4-staging | Approved (non-blocking note), fixed in `1803fdb`; follow-up comment asking for this file's two-section layout, fixed in `d983118`/`8dd6d74`; open, awaiting re-review |
+| [#74](https://github.com/Chanat-888/TokTickIT/pull/74) | feature/lab4-reviewer -> lab4-staging | Approved (non-blocking note), fixed in `1803fdb`; follow-up comment asking for this file's two-section layout, fixed in `d983118`/`8dd6d74`/`d19c639`; approved, merged by reviewer |
 | [#75](https://github.com/Chanat-888/TokTickIT/pull/75) | feature/lab4-ai-use -> lab4-staging | Changes requested (3 comments), fixed in `77907f2`, approved, merged by reviewer |
+| [#76](https://github.com/Chanat-888/TokTickIT/pull/76) | feature/lab4-screenshots -> lab4-staging | Approved with no changes requested, merged by reviewer |
 
 ### PR #68 — Sprint 4 engineering contract (Issue #61)
 
@@ -325,7 +326,23 @@ PRs" — since only the latter existed here; also noted the missing `**Reviewer 
 and a per-PR write-up for `ShitheadQuin/Toktickit#66`-`#71` (PR link, my actual review findings pulled
 from the GitHub API, Jeerasak's real reply, and my approval), and demoted the existing per-PR headings to
 nest under both sections consistently. Added the missing `**Reviewer decision:**` lines to #68-#70 in
-`8dd6d74`. This entry (and #75's) were added in a further commit once both were settled, per the
-reviewer's request.
+`8dd6d74`. Added the #74 and #75 write-ups (this section and the one above) in `d19c639` once both PRs
+were settled, per the reviewer's request.
 
-Awaiting re-review.
+Approved and merged into `lab4-staging` by the reviewer.
+
+### PR #76 — re-take screenshots on a fresh seed (Issue #67)
+
+Re-takes the dashboard/actions-taken/ticket-workflow screenshots flagged in PR #73's approval note: the
+previous set showed leftover e2e-run tickets ("Lab 4 screenshot ticket", "E2E-07…") in the "Recently
+Updated" lists. Ran `e2e/lab-04/responsive-visual.spec.ts` in isolation so the fresh reseed wasn't
+polluted by ticket-creating specs from other spec files running first.
+
+**Reviewer decision:** Approved, one non-blocking note.
+
+**Approval note:** verified the new screenshots against the seed (By Status totals 30, Unassigned 22,
+Accounts 4/3/1 all matched) and confirmed this closed the PR #73 note. Flagged that this file would need
+a #76 entry before the release PR.
+**Response:** this entry, added on the release PR (#77) after the reviewer flagged the gap there.
+
+Approved and merged into `lab4-staging` by the reviewer.
