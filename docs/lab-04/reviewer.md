@@ -3,8 +3,157 @@
 **Author:** Chanat Dachkumhang (GitHub: @Chanat-888)
 **Reviewer:** Jeerasak Phisawong (GitHub: @ShitheadQuin)
 
+We each keep our own copy of the repository (`Chanat-888/TokTickIT` and `ShitheadQuin/Toktickit`)
+and review each other's Pull Requests for every Lab 4 Issue.
+
 Updated as PRs are opened, reviewed and merged during the sprint, not reconstructed at the end.
 Per the course workflow guide, the reviewer merges each approved PR; the author replies to every comment.
+
+## Reviews I gave on my partner's PRs
+
+Pull Requests Jeerasak authored and I reviewed, all targeting his `lab4-staging`:
+
+| PR | Branch | My verdict |
+|----|--------|------------|
+| [#66](https://github.com/ShitheadQuin/Toktickit/pull/66) | feature/59-lab4-spec | Approved (one non-blocking note on the api-spec check-ordering), merged into lab4-staging |
+| [#67](https://github.com/ShitheadQuin/Toktickit/pull/67) | feature/60-actions-api | Approved (one non-blocking finding, a `TICKET_CLOSED` race), fix deferred and delivered in #69, merged into lab4-staging |
+| [#68](https://github.com/ShitheadQuin/Toktickit/pull/68) | feature/61-actions-ui | Approved (two non-blocking findings, an assignee-select gap and a dialog accessibility gap), fixes deferred and delivered in #69 and #71, merged into lab4-staging |
+| [#69](https://github.com/ShitheadQuin/Toktickit/pull/69) | feature/62-workflow | Approved with no changes requested, merged into lab4-staging |
+| [#70](https://github.com/ShitheadQuin/Toktickit/pull/70) | feature/63-dashboards | Approved with no changes requested, merged into lab4-staging |
+| [#71](https://github.com/ShitheadQuin/Toktickit/pull/71) | feature/64-hardening | Approved with no changes requested, merged into lab4-staging |
+
+Jeerasak's repository numbers its own business rules and tests independently of mine. Every
+reference below is to **his** `specification.md` / `api-spec.md` / `ui-spec.md` / `tests.md`, not to
+this repository's.
+
+### Sprint 4 engineering contract, [ShitheadQuin/Toktickit#66](https://github.com/ShitheadQuin/Toktickit/pull/66)
+
+Docs-only PR (+983/-0) — reviewed the four areas the PR description flagged (§11 transition matrix,
+BR-16 resolution gate, BR-26 dashboard calculations, §6 authorization matrix) plus overall cross-doc
+consistency.
+
+**My review (approved, one non-blocking note):** All four flagged areas were internally consistent
+across `specification.md`, `api-spec.md`, `ui-spec.md` and `tests.md` — the transition matrix covers
+all 8 statuses exactly once as a "to" state, the resolution gate wording matches everywhere it's
+cited, every dashboard drill-down link in the JSON examples matches the BR-26 table, and the
+authorization matrix matches BR-03/BR-22/FR-06. One note: `api-spec.md` §1's check ordering put
+`NOT_TICKET_OWNER` (403) after `409 STALE_UPDATE`, so a non-owner sending a stale version would learn
+the Ticket changed before being told they weren't authorized for that specific action — worth fixing
+during implementation, not blocking the contract.
+
+**Jeerasak's response:** None needed at the time; the ordering was corrected during implementation
+in #69 (ownership is now checked before the version, credited there as "PR #66's review note").
+
+**My approval:** Approved and merged into `lab4-staging`.
+
+### Actions Taken foundation: migration, seed, API and authorization, [ShitheadQuin/Toktickit#67](https://github.com/ShitheadQuin/Toktickit/pull/67)
+
++1442/-31 — migration, rollback script, `action-rules.ts`, `routes/actions.ts`, seed.
+
+**My review (approved, one non-blocking finding):** Validation and business rules matched the #66
+contract throughout (BR-05 through BR-12, BR-19, BR-20), and the migration/rollback are
+additive-only with tables dropped before the enum they depend on. One real finding: in both
+`POST /staff/tickets/:id/actions` and `PATCH /staff/actions/:id`, the `TICKET_CLOSED` check read the
+Ticket's status from a snapshot taken before the write, while only the Action's own `version` was
+re-checked atomically inside the transaction — so a Ticket closed by a concurrent request between the
+check and the commit could still get an Action written to it, which BR-10 says shouldn't happen.
+Narrow race window, not something a single-request test like API-08 would catch, and not blocking for
+a lab PR.
+
+**Jeerasak's response:** Agreed the check was right, deferred the fix to #62 (now #69) since that
+Issue already restructures how Ticket-status writes run in transactions. Fixed there with
+`writeActionIfTicketOpen`, which re-verifies the Ticket's status atomically inside the same
+transaction as the Action write via a conditional `updateMany` that also takes a row lock, with a
+test closing the Ticket between the check and the write.
+
+**My approval:** Approved and merged into `lab4-staging`. Verified the fix landed as described when
+reviewing #69.
+
+### Actions Taken UI, [ShitheadQuin/Toktickit#68](https://github.com/ShitheadQuin/Toktickit/pull/68)
+
++1346/-9 — `ActionsTaken.tsx` (620 lines), badges, theme, and the two Ticket Detail page integrations.
+
+**My review (approved, two non-blocking findings):** Client-side validation mirrored the server's
+BR-06/07/08 rules exactly, the `clientRequestId`-per-form-open plus a `submitting` ref guard correctly
+blocked double-submit duplicates, and the status `<select>` options came from the same transition
+table the server enforces. Two findings: (1) in create mode, the assignee `<select>` defaults to the
+signed-in user's id, but the "keep the stored assignee selectable even if missing from the list"
+fallback only fired in edit mode — once Administrators could reach this page, an Administrator
+creating an Action would see a mismatch between what's visually selected and what's actually
+submitted. (2) The Cancel-Action confirm dialog was hand-rolled with no focus trap or Escape
+handling, though the same gap already existed in Lab 3's own status-confirm dialog, so not a
+regression this PR introduced.
+
+**Jeerasak's response:** Agreed with both. (1) deferred to #62 (now #69), which opens the page to
+Administrators and adds Administrators to the assignable list — the same create-mode fallback edit
+mode already had, with a UI test for an Administrator opening Add Action. (2) `ui-spec.md` §13
+already promised focus trapping and Escape, so this was a gap against the spec even though Lab 3 had
+the same gap; fixed for every confirm dialog (Cancel Action, Cancel/Reopen Ticket, and a third site he
+pointed out I'd missed — the Requester's "Problem Appears Resolved" confirmation) in #64 (now #71),
+with a keyboard-navigation test.
+
+**My approval:** Approved and merged into `lab4-staging`. Verified both fixes landed as described
+when reviewing #69 and #71.
+
+### Ticket workflow: resolution gate, stale updates, status history and Administrator access, [ShitheadQuin/Toktickit#69](https://github.com/ShitheadQuin/Toktickit/pull/69)
+
++1119/-192 — `staff-tickets.ts`, new `resolution-gate.ts`, `actions.ts` changes, client status-control
+and history wiring.
+
+**My review (approved, no changes requested):** This PR closed all three outstanding findings from
+#66-#68 (see above) — verified each fix directly against the diff rather than taking the PR
+description's word for it. New logic also checked out on its own: the resolution gate is pure,
+correctly ignores Cancelled Actions, and is recounted inside the same `Serializable` transaction as
+the status write, so an Action added at the same instant can't slip past it; claim/reassign/
+priority/status all now atomically re-check `expectedVersion` via `updateMany` row-count; status
+history rows are written in the same transaction as every status-changing write, including a claim;
+and the minute-precision fix for the Action-date lower bound is a legitimate bug catch from the E2E
+run, with a unit test at the boundary.
+
+**Jeerasak's response:** None needed.
+
+**My approval:** Approved and merged into `lab4-staging`.
+
+### Role dashboards, [ShitheadQuin/Toktickit#70](https://github.com/ShitheadQuin/Toktickit/pull/70)
+
++1708/-60 — `dashboard-queries.ts`, `routes/dashboard.ts`, the `statusGroup=active` filter on both
+list endpoints, and the client Dashboard page plus URL-synced filters on My Tickets and the Queue.
+
+**My review (approved, no changes requested):** Specifically traced whether `statusGroup=active` is
+actually applied as a `WHERE` filter on both list endpoints, not just parsed for the conflict check —
+confirmed both build `{ currentStatus: { in: ACTIVE_STATUSES } }` from the same constant the
+dashboard's own counts use, so a card's count and the list its link opens are guaranteed to agree
+structurally. `byStatus` is correctly unfiltered (all 8 statuses, zeros included) while the
+active-only figures are correctly filtered; the description truncation for My Open Actions lands at
+exactly 120 characters; and the client's URL-param sync replaces history entries rather than pushing,
+so Back isn't flooded.
+
+**Jeerasak's response:** None needed.
+
+**My approval:** Approved and merged into `lab4-staging`.
+
+### Final hardening and regression, [ShitheadQuin/Toktickit#71](https://github.com/ShitheadQuin/Toktickit/pull/71)
+
++954/-122 — new shared `ConfirmDialog` component, not-found page, and the focus-return-to-Add-Action
+fix.
+
+**My review (approved, no changes requested):** `ConfirmDialog` directly resolved the accessibility
+gap noted on #68: focus starts on "Go back" (not the destructive action), Tab/Shift+Tab wrapping is
+computed from the dialog's own button list each keypress, Escape maps to cancel, and the opener
+regains focus on unmount — all verified against the component, not just the PR description. It's used
+consistently at all three call sites Jeerasak listed in his #68 reply. The focus-return-to-Add-Action
+fix is a real concurrency fix, not cosmetic: the old `setTimeout(..., 0)` raced against React's
+re-render bringing the button back into the DOM; the replacement (a ref flag checked in a
+dependency-less `useEffect`) correctly waits for the button to exist first.
+
+**Jeerasak's response:** None needed.
+
+**My approval:** Approved and merged into `lab4-staging`.
+
+## Reviews my partner gave on my PRs
+
+Pull Requests I authored on `Chanat-888/TokTickIT` and Jeerasak reviewed, all targeting my
+`lab4-staging`:
 
 | PR | Branch | Reviewer verdict |
 |----|--------|------------------|
@@ -15,7 +164,7 @@ Per the course workflow guide, the reviewer merges each approved PR; the author 
 | [#72](https://github.com/Chanat-888/TokTickIT/pull/72) | feature/lab4-dashboards -> lab4-staging | Changes requested (2 comments), fixed in `c00ba24`, approved, merged by reviewer |
 | [#73](https://github.com/Chanat-888/TokTickIT/pull/73) | feature/lab4-hardening -> lab4-staging | Approved (non-blocking note), merged by reviewer |
 
-## PR #68 — Sprint 4 engineering contract (Issue #61)
+### PR #68 — Sprint 4 engineering contract (Issue #61)
 
 Docs-only PR: `specification.md`, `ui-spec.md`, `api-spec.md`, `CLAUDE.md`.
 
@@ -37,7 +186,7 @@ Docs-only PR: `specification.md`, `ui-spec.md`, `api-spec.md`, `CLAUDE.md`.
 the current status, not `updatedAt`. **Response:** reworded in the #62 branch.
 Approved and merged into `lab4-staging` by the reviewer.
 
-## PR #69 — Actions Taken foundation (Issue #62)
+### PR #69 — Actions Taken foundation (Issue #62)
 
 Migration, seed, validation, three endpoints, and the first Lab 4 tests.
 
@@ -56,7 +205,7 @@ Migration, seed, validation, three endpoints, and the first Lab 4 tests.
 
 Approved and squash-merged into `lab4-staging` by the reviewer.
 
-## PR #70 — Ticket workflow (Issue #64)
+### PR #70 — Ticket workflow (Issue #64)
 
 Atomic stale-write protection (BR-17), status list filter (BR-27), the updatedAt fix, and the conflict banner.
 
@@ -76,7 +225,7 @@ Actions Taken UI branch (#63) because #70 was already merged.
 Approved and merged into `lab4-staging` by the reviewer.
 
 
-## PR #71 — Actions Taken UI (Issue #63)
+### PR #71 — Actions Taken UI (Issue #63)
 
 Ticket Detail Actions Taken list/create/inline-edit UI, Requester read-only view.
 
@@ -99,7 +248,7 @@ Ticket Detail Actions Taken list/create/inline-edit UI, Requester read-only view
 
 Approved and merged into `lab4-staging` by the reviewer.
 
-## PR #72 — Role dashboards (Issue #65)
+### PR #72 — Role dashboards (Issue #65)
 
 **Reviewer decision:** Changes requested.
 
@@ -112,7 +261,7 @@ Approved and merged into `lab4-staging` by the reviewer.
 
 Approved and merged into `lab4-staging` by the reviewer.
 
-## PR #73 — Final hardening and regression (Issue #66)
+### PR #73 — Final hardening and regression (Issue #66)
 
 Full Labs 1-3 regression pass, responsive/a11y checks, screenshots, README updates, `tests.md` final pass status.
 
