@@ -51,7 +51,7 @@ const STALE_BODY = (current: unknown) => ({
 // and can be swapped mid-test to simulate the server state moving on.
 function setupFetch(options: {
   getTicket?: () => Record<string, unknown>;
-  writeResponse?: (url: string, body: Record<string, unknown>) => Response;
+  writeResponse?: (url: string, body: Record<string, unknown>) => Response | Promise<Response>;
 }) {
   const state = { getTicket: options.getTicket ?? (() => baseTicket) };
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -176,6 +176,32 @@ describe("Ticket workflow controls (BR-15, BR-17)", () => {
     for (const [, init] of writeCalls(fetchMock)) {
       expect(JSON.parse(String((init as RequestInit).body)).expectedUpdatedAt).toBe(TOKEN);
     }
+  });
+
+  // Issue #78: Owner/IT-Priority/Status all send the same expectedUpdatedAt
+  // token, so a write in flight from one must disable the other two — not
+  // just itself — or the next write races ahead with a token the first
+  // write is about to invalidate.
+  it("IT Priority and Status stay disabled while a Claim write is in flight, and re-enable once it resolves", async () => {
+    let resolveClaim!: (response: Response) => void;
+    const pendingClaim = new Promise<Response>((resolve) => {
+      resolveClaim = resolve;
+    });
+    setupFetch({
+      getTicket: () => ({ ...baseTicket, ownerId: null }),
+      writeResponse: (url) => (url.includes("/owner") ? pendingClaim : json(baseTicket)),
+    });
+    renderScreen();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Claim" }));
+
+    expect(screen.getByLabelText("IT Priority")).toBeDisabled();
+    expect(screen.getByLabelText("Status")).toBeDisabled();
+
+    resolveClaim(json({ ...baseTicket, ownerId: 9 }));
+
+    await waitFor(() => expect(screen.getByLabelText("IT Priority")).toBeEnabled());
+    expect(screen.getByLabelText("Status")).toBeEnabled();
   });
 
   it("after a successful status change the summary status is refreshed from the server", async () => {

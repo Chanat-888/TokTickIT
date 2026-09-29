@@ -347,6 +347,8 @@ Accounts 4/3/1 all matched) and confirmed this closed the PR #73 note. Flagged t
 a #76 entry before the release PR.
 **Response:** this entry, added on the release PR (#77) after the reviewer flagged the gap there.
 
+Approved and merged into `lab4-staging` by the reviewer.
+
 ### PR #77 — Release integration to main (Issue #67)
 
 The single release PR merging `lab4-staging` into `main` at the end of the sprint (§11.1's
@@ -383,5 +385,3 @@ statusSaving` instead of each checking only its own saving flag.
 suites unaffected (275/275, 112/112).
 
 **Reviewer decision:** Review pending.
-
-Approved and merged into `lab4-staging` by the reviewer.
