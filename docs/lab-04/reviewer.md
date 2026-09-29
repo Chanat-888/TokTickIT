@@ -166,6 +166,8 @@ Pull Requests I authored on `Chanat-888/TokTickIT` and Jeerasak reviewed, all ta
 | [#74](https://github.com/Chanat-888/TokTickIT/pull/74) | feature/lab4-reviewer -> lab4-staging | Approved (non-blocking note), fixed in `1803fdb`; follow-up comment asking for this file's two-section layout, fixed in `d983118`/`8dd6d74`/`d19c639`; approved, merged by reviewer |
 | [#75](https://github.com/Chanat-888/TokTickIT/pull/75) | feature/lab4-ai-use -> lab4-staging | Changes requested (3 comments), fixed in `77907f2`, approved, merged by reviewer |
 | [#76](https://github.com/Chanat-888/TokTickIT/pull/76) | feature/lab4-screenshots -> lab4-staging | Approved with no changes requested, merged by reviewer |
+| [#77](https://github.com/Chanat-888/TokTickIT/pull/77) | lab4-staging -> main | Changes requested (fixed the #74/#76 gaps above), fixed in `e445b9c`, approved, merged by reviewer |
+| [#79](https://github.com/Chanat-888/TokTickIT/pull/79) | feature/lab4-claim-race -> lab4-staging | Review pending |
 
 ### PR #68 — Sprint 4 engineering contract (Issue #61)
 
@@ -346,3 +348,40 @@ a #76 entry before the release PR.
 **Response:** this entry, added on the release PR (#77) after the reviewer flagged the gap there.
 
 Approved and merged into `lab4-staging` by the reviewer.
+
+### PR #77 — Release integration to main (Issue #67)
+
+The single release PR merging `lab4-staging` into `main` at the end of the sprint (§11.1's
+"exactly one release PR" requirement).
+
+**Reviewer decision:** Changes requested — two gaps in this file (the #74 row/closing line
+inconsistency, and the missing #76 row/section, both noted above).
+
+**Response:** fixed in `e445b9c`.
+
+**Approval note:** "Both fixed. This PR is exactly lab4-staging, main has no extra commits, and it
+merges cleanly. After merge, please record the final test run from main in tests.md §6, and add this
+PR (#77) to reviewer.md." Approved and merged into `main` by the reviewer.
+
+**Post-merge follow-up:** ran the full suite against `main` per the approval note
+(`server` 275/275, `client` 112/112, seed run twice — idempotent). Playwright initially came back
+58/59: `e2e/lab-04/ticket-resolution.spec.ts` E2E-03 failed deterministically (3/3 runs on a fresh
+seed each time). Traced it to a genuine race in `StaffTicketDetail.tsx` — Owner/IT-Priority/Status
+all share `ticket.updatedAt` as their BR-17 concurrency token, but each control only disabled itself
+during its own save, so a write in flight from one could invalidate the token the others were about
+to send. Filed as [Issue #78](https://github.com/Chanat-888/TokTickIT/issues/78), fixed in
+[PR #79](https://github.com/Chanat-888/TokTickIT/pull/79). Recorded the final `main` result in
+`tests.md` §6.
+
+### PR #79 — Fix Owner/IT-Priority/Status write race on shared updatedAt token (Issue #78)
+
+Found while running the post-#77 full-suite pass against `main` (see above), not during normal
+feature-branch development — hence its own Issue (#78) rather than reopening #67.
+
+Gates all three controls on a shared `anyTicketWriteInFlight = ownerSaving || itPrioritySaving ||
+statusSaving` instead of each checking only its own saving flag.
+
+**Verification:** `client` typecheck clean; `e2e` Playwright 59/59 (was 58/59); `server`/`client`
+suites unaffected (275/275, 112/112).
+
+**Reviewer decision:** Review pending.
