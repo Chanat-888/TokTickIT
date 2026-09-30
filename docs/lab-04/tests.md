@@ -257,8 +257,40 @@ cd e2e && npx playwright test                  # responsive + E2E (dev servers, 
 
 ## 6. Final Results
 
-To be filled from a run on `main` after the release PR merges: per-suite
-pass counts, total, and the run date. Left blank until then.
+### Run on `main` after release PR #77 — 2026-09-28
+
+server 26 files / 275 tests, client 22 files / 112 tests, all passing.
+Seed (`npm run prisma:seed`) run twice: identical 10 users / 30 tickets
+both times, idempotent. Playwright came back 58/59:
+`e2e/lab-04/ticket-resolution.spec.ts` E2E-03 failed deterministically
+(3/3 runs, fresh seed each time), traced to a genuine race between the
+Owner/IT-Priority/Status controls sharing one `updatedAt` concurrency
+token in `StaffTicketDetail.tsx` — filed as
+[Issue #78](https://github.com/Chanat-888/TokTickIT/issues/78).
+
+**Fix verified on `feature/lab4-claim-race` ([PR #79](https://github.com/Chanat-888/TokTickIT/pull/79)),
+not yet on `main`:** with the fix, Playwright is 59/59 (server/client
+unaffected at 275/275 and 112/112).
+
+**Plan to land this on `main` (written down per the reviewer's request on
+PR #79):** #79 follows the same two-hop flow as every other Lab 4 change —
+`feature/lab4-claim-race` merges into `lab4-staging` via this
+peer-reviewed PR, then a second, small `lab4-staging -> main` PR carries
+it the rest of the way, exactly like #77 did for the sprint's planned
+work. This is not a second *sprint* release: "exactly one release PR"
+(`reviewer.md` §Required Branch Flow, this project's paraphrase of the
+Lab 2/3 handouts' branch-flow rule for the normal end-of-sprint
+integration) describes that one planned release covering the sprint's
+Issues, not a prohibition on ever fixing a regression found by the very
+step that rule requires (running the full suite on `main` after release,
+per the PR #77 approval note). The current Lab 4 handout §11.1 only says
+"Similar to Labs 2 and 3" and Part 1's evidence requirement asks for
+"commit-history evidence showing feature branches merged into
+lab4-staging and then main" — a pattern, not a one-PR-total ceiling.
+Issue #78 went through the normal Backlog -> Specified -> Started -> PR
+Review cycle rather than reopening #67, since it was found after that
+Issue's own work was already Done. This row will be updated with the
+final `main` count once the second PR merges.
 
 ### Pre-release run on `feature/lab4-hardening`
 

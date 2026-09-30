@@ -230,6 +230,12 @@ export default function StaffTicketDetail() {
   const [statusError, setStatusError] = useState<string | null>(null);
   const [pendingStatus, setPendingStatus] = useState<TicketStatus | null>(null);
 
+  // Owner/IT-Priority/Status writes all send the same `ticket.updatedAt` as
+  // their optimistic-concurrency token (BR-17), so any one write in flight
+  // makes that token stale for the other two — every control must wait for
+  // it, not just its own.
+  const anyTicketWriteInFlight = ownerSaving || itPrioritySaving || statusSaving;
+
   const [activeTab, setActiveTab] = useState<"public" | "internal" | "actions">("public");
   const actionsTaken = useActionsTaken(Number(id));
 
@@ -477,7 +483,7 @@ export default function StaffTicketDetail() {
                 <button
                   type="button"
                   className={`btn btn--secondary${ownerSaving ? " btn--busy" : ""}`}
-                  disabled={ownerSaving || conflict}
+                  disabled={anyTicketWriteInFlight || conflict}
                   aria-busy={ownerSaving}
                   onClick={handleClaim}
                 >
@@ -489,7 +495,7 @@ export default function StaffTicketDetail() {
                   className="owner-select field__control"
                   aria-label="Owner"
                   value={ticket.ownerId}
-                  disabled={ownerSaving || conflict}
+                  disabled={anyTicketWriteInFlight || conflict}
                   onChange={(e) => handleReassign(Number(e.target.value))}
                 >
                   {!assignableUsers.some((u) => u.id === ticket.ownerId) && (
@@ -511,7 +517,7 @@ export default function StaffTicketDetail() {
                 className="field__control"
                 aria-label="IT Priority"
                 value={ticket.itPriority}
-                disabled={itPrioritySaving || conflict}
+                disabled={anyTicketWriteInFlight || conflict}
                 onChange={(e) => handleItPriorityChange(e.target.value as Priority)}
               >
                 <option value="LOW">Low</option>
@@ -527,7 +533,9 @@ export default function StaffTicketDetail() {
                 className="status-select field__control"
                 aria-label="Status"
                 value=""
-                disabled={conflict || statusSaving || allowedStatusTargets(ticket.status).length === 0}
+                disabled={
+                  conflict || anyTicketWriteInFlight || allowedStatusTargets(ticket.status).length === 0
+                }
                 onChange={(e) => handleStatusSelect(e.target.value)}
               >
                 <option value="" disabled>
