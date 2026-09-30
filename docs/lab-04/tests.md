@@ -257,7 +257,13 @@ cd e2e && npx playwright test                  # responsive + E2E (dev servers, 
 
 ## 6. Final Results
 
-### Run on `main` after release PR #77 — 2026-09-28
+### Final run on `main` after release PR #80 — 2026-09-30
+
+server 26 files / 275 tests, client 22 files / 113 tests, Playwright
+59 tests (Labs 2, 3 and 4 together), **all passing** on `main` at
+`6e8a6b5`. This is the official final run.
+
+### Earlier run on `main` after release PR #77 — 2026-09-28
 
 server 26 files / 275 tests, client 22 files / 112 tests, all passing.
 Seed (`npm run prisma:seed`) run twice: identical 10 users / 30 tickets
@@ -268,9 +274,9 @@ Owner/IT-Priority/Status controls sharing one `updatedAt` concurrency
 token in `StaffTicketDetail.tsx` — filed as
 [Issue #78](https://github.com/Chanat-888/TokTickIT/issues/78).
 
-**Fix verified on `feature/lab4-claim-race` ([PR #79](https://github.com/Chanat-888/TokTickIT/pull/79)),
-not yet on `main`:** with the fix, Playwright is 59/59 (server/client
-unaffected at 275/275 and 112/112).
+**Fixed by [PR #79](https://github.com/Chanat-888/TokTickIT/pull/79)** (merged
+to `main` through release PR #80): Playwright 59/59, and a component test
+in `TicketWorkflow.test.tsx` now guards the race (client 113 tests).
 
 **Plan to land this on `main` (written down per the reviewer's request on
 PR #79):** #79 follows the same two-hop flow as every other Lab 4 change —
@@ -289,8 +295,8 @@ per the PR #77 approval note). The current Lab 4 handout §11.1 only says
 lab4-staging and then main" — a pattern, not a one-PR-total ceiling.
 Issue #78 went through the normal Backlog -> Specified -> Started -> PR
 Review cycle rather than reopening #67, since it was found after that
-Issue's own work was already Done. This row will be updated with the
-final `main` count once the second PR merges.
+Issue's own work was already Done. That second PR is #80; the final
+`main` result is the first block above.
 
 ### Pre-release run on `feature/lab4-hardening`
 
