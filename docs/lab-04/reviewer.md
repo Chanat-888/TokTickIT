@@ -167,7 +167,8 @@ Pull Requests I authored on `Chanat-888/TokTickIT` and Jeerasak reviewed, all ta
 | [#75](https://github.com/Chanat-888/TokTickIT/pull/75) | feature/lab4-ai-use -> lab4-staging | Changes requested (3 comments), fixed in `77907f2`, approved, merged by reviewer |
 | [#76](https://github.com/Chanat-888/TokTickIT/pull/76) | feature/lab4-screenshots -> lab4-staging | Approved with no changes requested, merged by reviewer |
 | [#77](https://github.com/Chanat-888/TokTickIT/pull/77) | lab4-staging -> main | Changes requested (fixed the #74/#76 gaps above), fixed in `e445b9c`, approved, merged by reviewer |
-| [#79](https://github.com/Chanat-888/TokTickIT/pull/79) | feature/lab4-claim-race -> lab4-staging | Review pending |
+| [#79](https://github.com/Chanat-888/TokTickIT/pull/79) | feature/lab4-claim-race -> lab4-staging | Changes requested (3 comments), fixed in `77e8e92`, approved, merged by reviewer |
+| [#80](https://github.com/Chanat-888/TokTickIT/pull/80) | lab4-staging -> main | Release of the #79 fix to `main`, merged by reviewer |
 
 ### PR #68 — Sprint 4 engineering contract (Issue #61)
 
@@ -384,4 +385,19 @@ statusSaving` instead of each checking only its own saving flag.
 **Verification:** `client` typecheck clean; `e2e` Playwright 59/59 (was 58/59); `server`/`client`
 suites unaffected (275/275, 112/112).
 
-**Reviewer decision:** Review pending.
+**Reviewer decision:** Changes requested.
+
+**Comments received and responses**
+
+1. This file: the #76 closing line had landed after the new #77/#79 sections.
+   **Response:** moved back under #76.
+2. Only Playwright E2E-03 caught the race.
+   **Response:** added a `TicketWorkflow.test.tsx` case (IT Priority and Status disabled while Claim is pending); confirmed it fails on the pre-fix source.
+3. The fix reaches `main` through a second `lab4-staging -> main` PR, but this file cites "exactly one release PR".
+   **Response:** plan written down in `tests.md` §6.
+
+All three fixed in `77e8e92`. Approved and merged into `lab4-staging` by the reviewer.
+
+### PR #80 — Release the #79 fix to main
+
+Second `lab4-staging -> main` PR carrying only #79 (4 files). Merged by the reviewer. Final suite on `main` after it: server 275/275, client 113/113, Playwright 59/59 (`tests.md` §6).
